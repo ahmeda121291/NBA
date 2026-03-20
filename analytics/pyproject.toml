@@ -1,0 +1,32 @@
+[project]
+name = "courtvision-analytics"
+version = "0.1.0"
+description = "CourtVision NBA analytics engine — metrics, projections, ingestion"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "psycopg2-binary>=2.9",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "nba_api>=1.5",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "apscheduler>=3.10",
+    "httpx>=0.28",
+    "pydantic>=2.10",
+    "python-dotenv>=1.0",
+    "structlog>=24.0",
+    "redis>=5.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
