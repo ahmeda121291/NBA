@@ -235,7 +235,7 @@ export function AskEngine({ players }: Props) {
     <div className="space-y-6">
       {/* Search Bar */}
       <div className="relative">
-        <div className="flex items-center gap-3 bg-white/[0.04] border border-white/[0.08] rounded-xl px-5 py-4 focus-within:border-indigo-500/40 transition-colors">
+        <div className="flex items-center gap-3 bg-[#1a1f2e] border border-white/[0.08] rounded-xl px-5 py-4 focus-within:border-indigo-500/40 transition-colors">
           <Search className="h-5 w-5 text-text-muted/40 shrink-0" />
           <input
             value={query}

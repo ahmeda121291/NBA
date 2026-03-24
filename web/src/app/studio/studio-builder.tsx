@@ -34,16 +34,24 @@ const CHART_TEMPLATES: { id: ChartType; label: string; desc: string; icon: any }
 ];
 
 const METRICS = [
-  { key: "bis", label: "BIS (Impact)" },
-  { key: "lfi", label: "LFI (Form)" },
-  { key: "drs", label: "DRS (Defense)" },
-  { key: "sps", label: "SPS (Shooting)" },
-  { key: "goi", label: "GOI (Gravity)" },
-  { key: "rda", label: "RDA (Role)" },
-  { key: "ppg", label: "PPG" },
-  { key: "rpg", label: "RPG" },
-  { key: "apg", label: "APG" },
-  { key: "fg3_pct", label: "3P%" },
+  // CourtVision
+  { key: "bis", label: "BIS (Impact)", group: "CourtVision" },
+  { key: "lfi", label: "LFI (Form)", group: "CourtVision" },
+  { key: "drs", label: "DRS (Defense)", group: "CourtVision" },
+  { key: "sps", label: "SPS (Shooting)", group: "CourtVision" },
+  { key: "goi", label: "GOI (Gravity)", group: "CourtVision" },
+  { key: "rda", label: "RDA (Role)", group: "CourtVision" },
+  // Traditional
+  { key: "ppg", label: "PPG", group: "Traditional" },
+  { key: "rpg", label: "RPG", group: "Traditional" },
+  { key: "apg", label: "APG", group: "Traditional" },
+  { key: "spg", label: "SPG", group: "Traditional" },
+  { key: "bpg", label: "BPG", group: "Traditional" },
+  { key: "mpg", label: "MPG", group: "Traditional" },
+  // Shooting
+  { key: "fg_pct", label: "FG%", group: "Shooting" },
+  { key: "fg3_pct", label: "3P%", group: "Shooting" },
+  { key: "ft_pct", label: "FT%", group: "Shooting" },
 ];
 
 function tierColor(score: number): string {
@@ -161,7 +169,7 @@ export function StudioBuilder({ players, teams }: Props) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary focus:border-indigo-500/40 outline-none"
+              className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary focus:border-indigo-500/40 outline-none placeholder:text-text-muted/40"
             />
           </div>
 
@@ -169,14 +177,26 @@ export function StudioBuilder({ players, teams }: Props) {
             <>
               <div>
                 <label className="text-[10px] text-text-muted/50 mb-1 block">X Axis</label>
-                <select value={xAxis} onChange={(e) => setXAxis(e.target.value)} className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none">
-                  {METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                <select value={xAxis} onChange={(e) => setXAxis(e.target.value)} className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none [&>option]:bg-[#1a1f2e] [&>option]:text-white">
+                  {["CourtVision", "Traditional", "Shooting"].map((group) => (
+                    <optgroup key={group} label={group}>
+                      {METRICS.filter((m) => m.group === group).map((m) => (
+                        <option key={m.key} value={m.key}>{m.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="text-[10px] text-text-muted/50 mb-1 block">Y Axis</label>
-                <select value={yAxis} onChange={(e) => setYAxis(e.target.value)} className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none">
-                  {METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                <select value={yAxis} onChange={(e) => setYAxis(e.target.value)} className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none [&>option]:bg-[#1a1f2e] [&>option]:text-white">
+                  {["CourtVision", "Traditional", "Shooting"].map((group) => (
+                    <optgroup key={group} label={group}>
+                      {METRICS.filter((m) => m.group === group).map((m) => (
+                        <option key={m.key} value={m.key}>{m.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             </>
@@ -185,8 +205,14 @@ export function StudioBuilder({ players, teams }: Props) {
           {(chartType === "top10" || chartType === "tier-list" || chartType === "bar-compare") && (
             <div>
               <label className="text-[10px] text-text-muted/50 mb-1 block">Metric</label>
-              <select value={metric} onChange={(e) => setMetric(e.target.value)} className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none">
-                {METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+              <select value={metric} onChange={(e) => setMetric(e.target.value)} className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none [&>option]:bg-[#1a1f2e] [&>option]:text-white">
+                {["CourtVision", "Traditional", "Shooting"].map((group) => (
+                    <optgroup key={group} label={group}>
+                      {METRICS.filter((m) => m.group === group).map((m) => (
+                        <option key={m.key} value={m.key}>{m.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
               </select>
             </div>
           )}
@@ -204,10 +230,10 @@ export function StudioBuilder({ players, teams }: Props) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search players..."
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary focus:border-indigo-500/40 outline-none"
+                className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary focus:border-indigo-500/40 outline-none placeholder:text-text-muted/40"
               />
               {filteredPlayers.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f1318] border border-white/[0.1] rounded-lg shadow-xl z-50 max-h-[200px] overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1f2e] border border-white/[0.1] rounded-lg shadow-xl z-50 max-h-[200px] overflow-y-auto">
                   {filteredPlayers.map((p) => (
                     <button key={p.id} onClick={() => addPlayer(p)} className="w-full text-left px-3 py-2 hover:bg-white/[0.05] text-sm flex justify-between">
                       <span>{p.name}</span>

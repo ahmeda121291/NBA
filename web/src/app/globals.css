@@ -756,3 +756,26 @@ a:hover {
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+
+/* ============================================================
+   FORM ELEMENTS — Dark theme overrides
+   ============================================================ */
+
+select,
+select option,
+select optgroup {
+  background-color: #1a1f2e !important;
+  color: #edf0f7 !important;
+}
+
+input::placeholder {
+  color: rgba(100, 116, 139, 0.5);
+}
+
+/* Ensure inputs/selects are always visible on dark backgrounds */
+input[type="text"],
+input[type="search"],
+input[type="number"],
+select {
+  color-scheme: dark;
+}

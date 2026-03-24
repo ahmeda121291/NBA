@@ -281,7 +281,7 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={{ minWidth: "700px" }}>
             <thead>
               <tr className="border-b border-white/[0.04]">
                 {visibleColumns.map((col) => (

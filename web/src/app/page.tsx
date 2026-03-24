@@ -508,7 +508,7 @@ export default async function DashboardPage() {
             <BarChart3 className="h-5 w-5 text-indigo-400 mx-auto mb-2" />
             <p className="text-xs font-semibold text-text-primary mb-1">CourtVision Metrics Engine v2</p>
             <p className="text-[10px] text-text-muted leading-relaxed">
-              6 player metrics + 6 team metrics · H2H matchups · Live projections at 69% accuracy
+              6 player metrics + 6 team metrics · H2H matchups · Live projections at 69% accuracy · Data updates daily
             </p>
             <a href="/methodology" className="inline-block mt-2 text-[10px] text-indigo-400 uppercase tracking-wider hover:underline">
               How It Works →
