@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { RadarChart } from "@/components/ui/radar-chart";
 import { ScoreOrb } from "@/components/ui/score-orb";
 import { MetricTooltip } from "@/components/shared/metric-tooltip";
-import { Search, X, User, Filter, ChevronDown } from "lucide-react";
+import { Search, X, User, Filter, ChevronDown, Trophy, Download } from "lucide-react";
+import { toPng } from "html-to-image";
 import { getPlayerHeadshotUrl, getTeamLogoByAbbr } from "@/lib/nba-data";
 import { tierClass, num } from "@/lib/formatting";
 
@@ -204,9 +205,73 @@ export default function ComparePage() {
     { key: "mpg", label: "MPG" },
   ];
 
+  const compareRef = useRef<HTMLDivElement>(null);
   const hasComparison = player1 && player2;
 
-  const radarDatasets = [];
+  // Generate verdict
+  const verdict = useMemo(() => {
+    if (!hasComparison) return null;
+    const metrics = metricKeys.map((k) => ({
+      key: k,
+      v1: num(player1[`${k}_score`]) ?? 0,
+      v2: num(player2[`${k}_score`]) ?? 0,
+    }));
+    const p1Wins = metrics.filter((m) => m.v1 > m.v2).length;
+    const p2Wins = metrics.filter((m) => m.v2 > m.v1).length;
+    const bis1 = num(player1.bis_score) ?? 0;
+    const bis2 = num(player2.bis_score) ?? 0;
+    const lfi1 = num(player1.lfi_score) ?? 0;
+    const lfi2 = num(player2.lfi_score) ?? 0;
+    const drs1 = num(player1.drs_score) ?? 0;
+    const drs2 = num(player2.drs_score) ?? 0;
+
+    let winner = bis1 >= bis2 ? 1 : 2;
+    let margin = Math.abs(bis1 - bis2);
+    let verdict = "";
+    let detail = "";
+
+    if (margin < 3) {
+      verdict = "Too close to call";
+      detail = `These two are virtually identical by BIS (${bis1.toFixed(0)} vs ${bis2.toFixed(0)}). The tiebreaker comes down to fit and role.`;
+    } else if (margin < 10) {
+      const w = winner === 1 ? player1 : player2;
+      const l = winner === 1 ? player2 : player1;
+      verdict = `${w.full_name.split(" ").pop()} has the edge`;
+      detail = `${w.full_name} leads ${p1Wins > p2Wins ? p1Wins : p2Wins}-${Math.min(p1Wins, p2Wins)} across 6 CourtVision metrics. Close matchup but ${w.full_name.split(" ")[0]} is the more complete player right now.`;
+    } else {
+      const w = winner === 1 ? player1 : player2;
+      const l = winner === 1 ? player2 : player1;
+      verdict = `${w.full_name.split(" ").pop()} clearly`;
+      detail = `${w.full_name} is a tier above with a BIS of ${(winner === 1 ? bis1 : bis2).toFixed(0)} vs ${(winner === 1 ? bis2 : bis1).toFixed(0)}. Wins ${Math.max(p1Wins, p2Wins)} of 6 metric categories.`;
+    }
+
+    // Add form context
+    if (Math.abs(lfi1 - lfi2) > 15) {
+      const hotter = lfi1 > lfi2 ? player1 : player2;
+      detail += ` ${hotter.full_name.split(" ")[0]} is currently in much better form (LFI ${Math.max(lfi1, lfi2).toFixed(0)} vs ${Math.min(lfi1, lfi2).toFixed(0)}).`;
+    }
+
+    // Add defensive context
+    if (Math.abs(drs1 - drs2) > 15) {
+      const betterD = drs1 > drs2 ? player1 : player2;
+      detail += ` ${betterD.full_name.split(" ")[0]} is significantly better defensively (DRS ${Math.max(drs1, drs2).toFixed(0)} vs ${Math.min(drs1, drs2).toFixed(0)}).`;
+    }
+
+    return { winner, verdict, detail, p1Wins, p2Wins };
+  }, [hasComparison, player1, player2, metricKeys]);
+
+  const handleDownload = useCallback(async () => {
+    if (!compareRef.current) return;
+    try {
+      const dataUrl = await toPng(compareRef.current, { backgroundColor: "#0a0e1a", pixelRatio: 2 });
+      const link = document.createElement("a");
+      link.download = `courtvision-compare-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) { console.error(err); }
+  }, []);
+
+  const radarDatasets: any[] = [];
   if (player1) {
     radarDatasets.push({
       label: player1.full_name,
@@ -237,7 +302,28 @@ export default function ComparePage() {
 
       {hasComparison && (
         <>
-          {/* Radar Chart */}
+          {/* Verdict */}
+          {verdict && (
+            <GlassCard variant="accent">
+              <div className="flex items-center gap-2 mb-3">
+                <Trophy className="h-4 w-4 text-amber-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">The Verdict</span>
+                <button onClick={handleDownload} className="ml-auto flex items-center gap-1 text-[10px] text-text-muted hover:text-indigo-400 transition-colors border border-white/[0.08] rounded px-2 py-1">
+                  <Download className="h-3 w-3" /> Download PNG
+                </button>
+              </div>
+              <p className="text-lg font-bold text-text-primary mb-1">{verdict.verdict}</p>
+              <p className="text-[12px] text-text-secondary leading-relaxed">{verdict.detail}</p>
+              <div className="flex items-center gap-4 mt-3">
+                <span className="text-[10px] text-indigo-400 font-stat font-bold">{player1.full_name.split(" ").pop()}: {verdict.p1Wins} wins</span>
+                <span className="text-[10px] text-amber-400 font-stat font-bold">{player2.full_name.split(" ").pop()}: {verdict.p2Wins} wins</span>
+                <span className="text-[10px] text-text-muted/40 font-stat">{6 - verdict.p1Wins - verdict.p2Wins} ties</span>
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Radar Chart (downloadable) */}
+          <div ref={compareRef}>
           <GlassCard>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted mb-2">Metric Overlay</h2>
             <div className="flex items-center justify-center gap-6 mb-4">
@@ -339,6 +425,10 @@ export default function ComparePage() {
               </table>
             </div>
           </GlassCard>
+          <div className="text-right py-1">
+            <span className="text-[9px] text-text-muted/20 font-stat">courtvisionai.io</span>
+          </div>
+          </div>{/* close compareRef */}
         </>
       )}
     </div>
