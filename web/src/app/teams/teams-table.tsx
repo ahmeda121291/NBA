@@ -64,64 +64,64 @@ export function TeamsTable({ teams }: Props) {
     },
     // CourtVision metrics
     {
-      key: "tsc", label: "TSC", align: "right", sortable: true, isMetric: true, metricKey: "tsc",
+      key: "tsc", label: "TSC", align: "right", sortable: true, isMetric: true, metricKey: "tsc", width: "60px",
       sortValue: (r) => num(r.tsc_score),
       render: (r) => <span className={`font-stat font-bold ${tierClass(num(r.tsc_score))}`}>{fmt(r.tsc_score, 0)}</span>,
     },
     {
-      key: "ltfi", label: "LTFI", align: "right", sortable: true, isMetric: true, metricKey: "ltfi",
+      key: "ltfi", label: "LTFI", align: "right", sortable: true, isMetric: true, metricKey: "ltfi", width: "55px",
       sortValue: (r) => num(r.ltfi_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.ltfi_score))}`}>{fmt(r.ltfi_score, 0)}</span>,
     },
     {
-      key: "lss", label: "LSS", align: "right", sortable: true, isMetric: true, metricKey: "lss", defaultVisible: false,
+      key: "lss", label: "LSS", align: "right", sortable: true, isMetric: true, metricKey: "lss", width: "55px", defaultVisible: false,
       sortValue: (r) => num(r.lss_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.lss_score))}`}>{fmt(r.lss_score, 0)}</span>,
     },
     {
-      key: "drs", label: "DRS", align: "right", sortable: true, isMetric: true, metricKey: "drs_team", defaultVisible: false,
+      key: "drs", label: "DRS", align: "right", sortable: true, isMetric: true, metricKey: "drs_team", width: "55px", defaultVisible: false,
       sortValue: (r) => num(r.drs_team_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.drs_team_score))}`}>{fmt(r.drs_team_score, 0)}</span>,
     },
     {
-      key: "pts", label: "PTS", align: "right", sortable: true, isMetric: true, metricKey: "pts", defaultVisible: false,
+      key: "pts", label: "PTS", align: "right", sortable: true, isMetric: true, metricKey: "pts", width: "55px", defaultVisible: false,
       sortValue: (r) => num(r.pts_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.pts_score))}`}>{fmt(r.pts_score, 0)}</span>,
     },
     {
-      key: "rp", label: "RP", align: "right", sortable: true, isMetric: true, metricKey: "rp", defaultVisible: false,
+      key: "rp", label: "RP", align: "right", sortable: true, isMetric: true, metricKey: "rp", width: "55px", defaultVisible: false,
       sortValue: (r) => num(r.rp_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.rp_score))}`}>{fmt(r.rp_score, 0)}</span>,
     },
     // Traditional stats
     {
-      key: "fg", label: "FG%", align: "right", sortable: true, isMetric: true, metricKey: "fg_pct",
+      key: "fg", label: "FG%", align: "right", sortable: true, isMetric: true, metricKey: "fg_pct", width: "60px",
       sortValue: (r) => num(r.fg_pct),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{pct(r.fg_pct)}</span>,
     },
     {
-      key: "fg3", label: "3P%", align: "right", sortable: true, isMetric: true, metricKey: "fg3_pct",
+      key: "fg3", label: "3P%", align: "right", sortable: true, isMetric: true, metricKey: "fg3_pct", width: "60px",
       sortValue: (r) => num(r.fg3_pct),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{pct(r.fg3_pct)}</span>,
     },
     {
-      key: "ft", label: "FT%", align: "right", sortable: true, isMetric: true, metricKey: "ft_pct", defaultVisible: false,
+      key: "ft", label: "FT%", align: "right", sortable: true, isMetric: true, metricKey: "ft_pct", width: "60px", defaultVisible: false,
       sortValue: (r) => num(r.ft_pct),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{pct(r.ft_pct)}</span>,
     },
     // Advanced stats
     {
-      key: "ortg", label: "ORTG", align: "right", sortable: true, isMetric: true, metricKey: "ortg", defaultVisible: false,
+      key: "ortg", label: "ORTG", align: "right", sortable: true, isMetric: true, metricKey: "ortg", width: "65px", defaultVisible: false,
       sortValue: (r) => num(r.ortg),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{fmt(r.ortg)}</span>,
     },
     {
-      key: "drtg", label: "DRTG", align: "right", sortable: true, isMetric: true, metricKey: "drtg", defaultVisible: false,
+      key: "drtg", label: "DRTG", align: "right", sortable: true, isMetric: true, metricKey: "drtg", width: "65px", defaultVisible: false,
       sortValue: (r) => num(r.drtg),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{fmt(r.drtg)}</span>,
     },
     {
-      key: "netrtg", label: "Net RTG", align: "right", sortable: true, isMetric: true, metricKey: "net_rating", defaultVisible: false,
+      key: "netrtg", label: "Net RTG", align: "right", sortable: true, isMetric: true, metricKey: "net_rating", width: "70px", defaultVisible: false,
       sortValue: (r) => num(r.net_rating),
       render: (r) => {
         const v = num(r.net_rating);
@@ -131,12 +131,12 @@ export function TeamsTable({ teams }: Props) {
       },
     },
     {
-      key: "pace", label: "Pace", align: "right", sortable: true, isMetric: true, metricKey: "pace", defaultVisible: false,
+      key: "pace", label: "Pace", align: "right", sortable: true, isMetric: true, metricKey: "pace", width: "60px", defaultVisible: false,
       sortValue: (r) => num(r.pace),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{fmt(r.pace)}</span>,
     },
     {
-      key: "elo", label: "Elo", align: "right", sortable: true, isMetric: true, metricKey: "elo",
+      key: "elo", label: "Elo", align: "right", sortable: true, isMetric: true, metricKey: "elo", width: "65px",
       sortValue: (r) => num(r.elo_rating),
       render: (r) => {
         const elo = num(r.elo_rating);
@@ -146,7 +146,7 @@ export function TeamsTable({ teams }: Props) {
       },
     },
     {
-      key: "sos", label: "SOS", align: "right", sortable: true, isMetric: true, metricKey: "sos", defaultVisible: false,
+      key: "sos", label: "SOS", align: "right", sortable: true, isMetric: true, metricKey: "sos", width: "60px", defaultVisible: false,
       sortValue: (r) => num(r.sos),
       render: (r) => <span className="font-stat text-[12px] text-text-secondary">{fmt(r.sos, 3)}</span>,
     },

@@ -589,12 +589,12 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
                         <span className="text-[10px] text-text-muted ml-1.5">{p.team_abbr}</span>
                       </a>
                     </td>
-                    <td className="px-3 py-2 text-right font-stat font-bold text-text-primary">{Number(p.proj_pts).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat font-bold text-text-primary">{p.proj_pts != null ? Number(p.proj_pts).toFixed(1) : "—"}</td>
                     <td className="px-3 py-2 text-right font-stat text-text-muted/50 text-[11px]">
-                      {Number(p.proj_pts_low).toFixed(0)}-{Number(p.proj_pts_high).toFixed(0)}
+                      {p.proj_pts_low != null ? `${Number(p.proj_pts_low).toFixed(0)}-${Number(p.proj_pts_high).toFixed(0)}` : "—"}
                     </td>
-                    <td className="px-3 py-2 text-right font-stat text-text-muted">{Number(p.proj_reb).toFixed(1)}</td>
-                    <td className="px-3 py-2 text-right font-stat text-text-muted">{Number(p.proj_ast).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat text-text-muted">{p.proj_reb != null ? Number(p.proj_reb).toFixed(1) : "—"}</td>
+                    <td className="px-3 py-2 text-right font-stat text-text-muted">{p.proj_ast != null ? Number(p.proj_ast).toFixed(1) : "—"}</td>
                     <td className={`px-3 py-2 text-right font-stat font-bold ${tierClass(p.bis_score ? Number(p.bis_score) : null)}`}>
                       {p.bis_score ? Number(p.bis_score).toFixed(0) : "—"}
                     </td>
