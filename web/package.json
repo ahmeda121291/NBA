@@ -16,7 +16,8 @@
     "pipeline:scores": "npx tsx ../scripts/orchestrate.ts scores",
     "ingest": "npx tsx ../scripts/ingest.ts",
     "metrics": "npx tsx ../scripts/compute-metrics.ts",
-    "projections": "npx tsx ../scripts/compute-projections.ts"
+    "projections": "npx tsx ../scripts/compute-projections.ts",
+    "salaries": "npx tsx ../scripts/scrape-salaries.ts"
   },
   "dependencies": {
     "@stripe/stripe-js": "^8.11.0",
