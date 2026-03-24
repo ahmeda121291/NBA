@@ -15,6 +15,8 @@ import {
   Zap,
   CreditCard,
   Crown,
+  Palette,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,9 +27,11 @@ const navItems = [
   { href: "/players", label: "Players", icon: User, shortcut: "4" },
   { href: "/leaderboards", label: "Leaderboards", icon: Trophy, shortcut: "5" },
   { href: "/compare", label: "Compare", icon: GitCompare, shortcut: "6" },
-  { href: "/pulse", label: "Pulse", icon: Zap, shortcut: "7" },
-  { href: "/methodology", label: "Methodology", icon: BookOpen, shortcut: "8" },
-  { href: "/pricing", label: "Pricing", icon: Crown, shortcut: "9" },
+  { href: "/pulse", label: "Daily Brief", icon: Zap, shortcut: "7" },
+  { href: "/studio", label: "Studio", icon: Palette, shortcut: "8" },
+  { href: "/ask", label: "Ask CV", icon: MessageCircle, shortcut: "9" },
+  { href: "/methodology", label: "Methodology", icon: BookOpen, shortcut: "0" },
+  { href: "/pricing", label: "Pricing", icon: Crown, shortcut: "" },
 ];
 
 interface SidebarProps {
