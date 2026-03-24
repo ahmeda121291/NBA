@@ -278,7 +278,7 @@ export function StudioBuilder({ players, teams }: Props) {
           {/* Title */}
           <div className="mb-6">
             <h2 className="text-xl font-bold text-white">{title}</h2>
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-[11px] text-text-muted/70 mt-1">
               {METRICS.find((m) => m.key === (chartType === "quadrant" ? xAxis : metric))?.label}
               {chartType === "quadrant" && ` vs ${METRICS.find((m) => m.key === yAxis)?.label}`}
               {" · "}2025-26 Season
@@ -318,7 +318,7 @@ export function StudioBuilder({ players, teams }: Props) {
             <div className="h-3 w-3 rounded-full bg-indigo-500/30 flex items-center justify-center">
               <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
             </div>
-            <span className="text-[9px] text-gray-600 font-semibold tracking-wider">courtvisionai.io</span>
+            <span className="text-[9px] text-text-muted/50 font-semibold tracking-wider">courtvisionai.io</span>
           </div>
         </div>
       </div>
@@ -333,7 +333,7 @@ export function StudioBuilder({ players, teams }: Props) {
 function QuadrantChart({ players, xKey, yKey }: { players: PlayerData[]; xKey: string; yKey: string }) {
   const xVals = players.map((p) => getVal(p, xKey)).filter((v) => v > 0);
   const yVals = players.map((p) => getVal(p, yKey)).filter((v) => v > 0);
-  if (xVals.length === 0 || yVals.length === 0) return <p className="text-gray-500 text-sm">No data available</p>;
+  if (xVals.length === 0 || yVals.length === 0) return <p className="text-text-muted/70 text-sm">No data available</p>;
 
   const xMin = Math.min(...xVals) * 0.9;
   const xMax = Math.max(...xVals) * 1.05;
@@ -352,14 +352,14 @@ function QuadrantChart({ players, xKey, yKey }: { players: PlayerData[]; xKey: s
     <div className="w-full overflow-x-auto">
       <svg width={w} height={h} className="mx-auto">
         {/* Quadrant lines */}
-        <line x1={toX(xMid)} y1={pad.top} x2={toX(xMid)} y2={h - pad.bottom} stroke="rgba(255,255,255,0.06)" strokeDasharray="4,4" />
-        <line x1={pad.left} y1={toY(yMid)} x2={w - pad.right} y2={toY(yMid)} stroke="rgba(255,255,255,0.06)" strokeDasharray="4,4" />
+        <line x1={toX(xMid)} y1={pad.top} x2={toX(xMid)} y2={h - pad.bottom} stroke="rgba(255,255,255,0.12)" strokeDasharray="4,4" />
+        <line x1={pad.left} y1={toY(yMid)} x2={w - pad.right} y2={toY(yMid)} stroke="rgba(255,255,255,0.12)" strokeDasharray="4,4" />
 
         {/* Quadrant labels */}
-        <text x={toX(xMin) + 10} y={toY(yMax) + 15} fill="rgba(255,255,255,0.12)" fontSize="10" fontWeight="bold">UNDERRATED</text>
+        <text x={toX(xMin) + 10} y={toY(yMax) + 15} fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold">UNDERRATED</text>
         <text x={toX(xMax) - 80} y={toY(yMax) + 15} fill="rgba(129,140,248,0.25)" fontSize="10" fontWeight="bold">ELITE</text>
         <text x={toX(xMin) + 10} y={toY(yMin) - 5} fill="rgba(244,63,94,0.2)" fontSize="10" fontWeight="bold">LOW IMPACT</text>
-        <text x={toX(xMax) - 80} y={toY(yMin) - 5} fill="rgba(255,255,255,0.12)" fontSize="10" fontWeight="bold">OVERRATED</text>
+        <text x={toX(xMax) - 80} y={toY(yMin) - 5} fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold">OVERRATED</text>
 
         {/* Points */}
         {players.map((p) => {
@@ -372,7 +372,7 @@ function QuadrantChart({ players, xKey, yKey }: { players: PlayerData[]; xKey: s
           return (
             <g key={p.id}>
               <circle cx={cx} cy={cy} r={4} fill={tierColor(bis)} opacity={0.85} />
-              <text x={cx + 6} y={cy + 3} fill="rgba(255,255,255,0.6)" fontSize="8" fontFamily="monospace">
+              <text x={cx + 6} y={cy + 3} fill="rgba(255,255,255,0.85)" fontSize="8" fontFamily="monospace">
                 {p.name.split(" ").pop()}
               </text>
             </g>
@@ -380,10 +380,10 @@ function QuadrantChart({ players, xKey, yKey }: { players: PlayerData[]; xKey: s
         })}
 
         {/* Axis labels */}
-        <text x={w / 2} y={h - 5} fill="rgba(255,255,255,0.3)" fontSize="10" textAnchor="middle">
+        <text x={w / 2} y={h - 5} fill="rgba(255,255,255,0.5)" fontSize="10" textAnchor="middle">
           {METRICS.find((m) => m.key === xKey)?.label} →
         </text>
-        <text x={12} y={h / 2} fill="rgba(255,255,255,0.3)" fontSize="10" textAnchor="middle" transform={`rotate(-90, 12, ${h / 2})`}>
+        <text x={12} y={h / 2} fill="rgba(255,255,255,0.5)" fontSize="10" textAnchor="middle" transform={`rotate(-90, 12, ${h / 2})`}>
           {METRICS.find((m) => m.key === yKey)?.label} →
         </text>
       </svg>
@@ -400,14 +400,14 @@ function Top10List({ players, metric, metricLabel }: { players: PlayerData[]; me
         const pct = (val / maxVal) * 100;
         return (
           <div key={p.id} className="flex items-center gap-3">
-            <span className={`w-7 text-right font-bold text-lg ${i === 0 ? "text-amber-400" : i === 1 ? "text-gray-400" : i === 2 ? "text-amber-600" : "text-gray-600"}`}>
+            <span className={`w-7 text-right font-bold text-lg ${i === 0 ? "text-amber-400" : i === 1 ? "text-text-muted/80" : i === 2 ? "text-amber-600" : "text-text-muted/50"}`}>
               {i + 1}
             </span>
             <div className="flex-1">
               <div className="flex items-center justify-between mb-0.5">
                 <div>
                   <span className="text-sm font-semibold text-white">{p.name}</span>
-                  <span className="text-[10px] text-gray-500 ml-2">{p.team}</span>
+                  <span className="text-[10px] text-text-muted/70 ml-2">{p.team}</span>
                 </div>
                 <span className="font-mono text-sm font-bold" style={{ color: tierColor(val) }}>
                   {metric.includes("pct") ? (val * 100).toFixed(1) + "%" : val.toFixed(1)}
@@ -444,15 +444,15 @@ function TierList({ groups, metric, metricLabel }: {
           <div key={t.key} className="rounded-lg p-3" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: t.color }}>{t.label}</span>
-              <span className="text-[9px] text-gray-500">({items.length} players)</span>
+              <span className="text-[9px] text-text-muted/70">({items.length} players)</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {items.slice(0, 12).map((p: PlayerData) => (
-                <span key={p.id} className="text-[10px] px-2 py-0.5 rounded bg-black/20 text-gray-300 font-mono">
+                <span key={p.id} className="text-[10px] px-2 py-0.5 rounded bg-black/20 text-text-secondary font-mono">
                   {p.name.split(" ").slice(-1)[0]} <span style={{ color: t.color }}>{getVal(p, metric).toFixed(0)}</span>
                 </span>
               ))}
-              {items.length > 12 && <span className="text-[10px] text-gray-600">+{items.length - 12} more</span>}
+              {items.length > 12 && <span className="text-[10px] text-text-muted/50">+{items.length - 12} more</span>}
             </div>
           </div>
         );
@@ -462,7 +462,7 @@ function TierList({ groups, metric, metricLabel }: {
 }
 
 function BarCompare({ players, metric, metricLabel }: { players: PlayerData[]; metric: string; metricLabel: string }) {
-  if (players.length === 0) return <p className="text-gray-500 text-sm text-center py-12">Add 2-5 players from the left panel to compare</p>;
+  if (players.length === 0) return <p className="text-text-muted/70 text-sm text-center py-12">Add 2-5 players from the left panel to compare</p>;
   const maxVal = Math.max(...players.map((p) => getVal(p, metric)), 1);
 
   return (
@@ -474,7 +474,7 @@ function BarCompare({ players, metric, metricLabel }: { players: PlayerData[]; m
           <div key={p.id} className="flex items-center gap-4">
             <div className="w-32 text-right">
               <p className="text-sm font-semibold text-white truncate">{p.name}</p>
-              <p className="text-[10px] text-gray-500">{p.team} · {p.position}</p>
+              <p className="text-[10px] text-text-muted/70">{p.team} · {p.position}</p>
             </div>
             <div className="flex-1">
               <div className="h-8 rounded bg-white/[0.04] overflow-hidden relative">
@@ -502,18 +502,18 @@ function MatchupCard({ teams }: { teams: TeamData[] }) {
     <div className="flex items-center justify-center gap-8 py-8">
       <div className="text-center">
         <p className="text-2xl font-bold text-white">{t1.abbr}</p>
-        <p className="text-sm text-gray-400">{t1.wins}-{t1.losses}</p>
+        <p className="text-sm text-text-muted/80">{t1.wins}-{t1.losses}</p>
         {t1.tsc && <p className="text-[11px] font-mono mt-1" style={{ color: tierColor(t1.tsc) }}>TSC {t1.tsc.toFixed(0)}</p>}
-        {t1.elo && <p className="text-[10px] text-gray-500 font-mono">Elo {t1.elo.toFixed(0)}</p>}
+        {t1.elo && <p className="text-[10px] text-text-muted/70 font-mono">Elo {t1.elo.toFixed(0)}</p>}
       </div>
       <div className="text-center">
-        <p className="text-3xl font-bold text-gray-600">VS</p>
+        <p className="text-3xl font-bold text-text-muted/50">VS</p>
       </div>
       <div className="text-center">
         <p className="text-2xl font-bold text-white">{t2.abbr}</p>
-        <p className="text-sm text-gray-400">{t2.wins}-{t2.losses}</p>
+        <p className="text-sm text-text-muted/80">{t2.wins}-{t2.losses}</p>
         {t2.tsc && <p className="text-[11px] font-mono mt-1" style={{ color: tierColor(t2.tsc) }}>TSC {t2.tsc.toFixed(0)}</p>}
-        {t2.elo && <p className="text-[10px] text-gray-500 font-mono">Elo {t2.elo.toFixed(0)}</p>}
+        {t2.elo && <p className="text-[10px] text-text-muted/70 font-mono">Elo {t2.elo.toFixed(0)}</p>}
       </div>
     </div>
   );
