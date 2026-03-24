@@ -357,7 +357,7 @@ async function main() {
         ${pm.sps}, ${pm.spsConfidence}, ${pm.spsLabel}, ${JSON.stringify(pm.spsComponents)},
         ${pm.goi}, ${pm.goiConfidence}, ${JSON.stringify(pm.goiComponents)}
       )
-      ON CONFLICT (player_id, season_id, as_of_date)
+      ON CONFLICT (player_id)
       DO UPDATE SET
         computed_at = NOW(),
         bis_score = EXCLUDED.bis_score,
@@ -570,7 +570,7 @@ async function main() {
         ${Math.round(drsTeam * 100) / 100}, ${drsTeamStarDrop},
         ${JSON.stringify({ drtg, leagueAvg: teamLeagueAvg.drtg, diff: drtgDiff })}
       )
-      ON CONFLICT (team_id, season_id, as_of_date)
+      ON CONFLICT (team_id, season_id)
       DO UPDATE SET
         computed_at = NOW(),
         tsc_score = EXCLUDED.tsc_score,
