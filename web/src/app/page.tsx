@@ -1,20 +1,20 @@
 import Image from "next/image";
-import { Calendar, TrendingUp, Zap, Flame, ArrowRight, AlertTriangle, Activity, BarChart3, Shield } from "lucide-react";
+import { Calendar, TrendingUp, TrendingDown, Zap, Flame, ArrowRight, AlertTriangle, Activity, BarChart3, Shield, Target, Sparkles, MessageCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
-import { ConfidenceIndicator } from "@/components/metrics/confidence-indicator";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
-import { getTodaysGamesWithProjections, getHottestPlayers, getTopPlayersWithMetrics, getAllTeamsWithMetrics } from "@/lib/db/queries";
+import { getTodaysGamesWithProjections, getHottestPlayers, getTopPlayersWithMetrics, getAllTeamsWithMetrics, getBiggestMovers } from "@/lib/db/queries";
 import { computeLiveProjections } from "@/lib/projections";
 import { tierClass, getStreakBadge } from "@/lib/formatting";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [todaysGames, hotPlayers, topByBIS, teamsRanked] = await Promise.all([
+  const [todaysGames, hotPlayers, topByBIS, teamsRanked, movers] = await Promise.all([
     getTodaysGamesWithProjections(),
-    getHottestPlayers(5),
+    getHottestPlayers(7),
     getTopPlayersWithMetrics(5),
     getAllTeamsWithMetrics(),
+    getBiggestMovers(6),
   ]);
 
   let games = todaysGames as any[];
@@ -33,38 +33,200 @@ export default async function DashboardPage() {
         ...g,
         projected_winner_id: proj.projected_winner_id,
         win_prob_home: proj.win_prob_home,
+        win_prob_away: proj.win_prob_away,
         proj_score_home: proj.proj_score_home,
         proj_score_away: proj.proj_score_away,
+        confidence: proj.confidence,
+        upset_risk: proj.upset_risk,
         pick_abbr: proj.winner_abbr,
+        key_reasons: proj.key_reasons,
       };
     });
   }
+
   const slateDate = games.length > 0
     ? new Date(String(games[0].game_date) + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : null;
   const hot = hotPlayers as any[];
   const topBIS = topByBIS as any[];
   const teams = (teamsRanked as any[]).slice(0, 5);
+  const allMovers = movers as any[];
+  const risers = allMovers.filter((m: any) => Number(m.lfi_delta || 0) > 0).slice(0, 3);
+  const fallers = allMovers.filter((m: any) => Number(m.lfi_delta || 0) < 0).slice(0, 3);
 
   const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
+  // Find the "best edge" game — highest confidence with >55% win prob
+  const bestEdge = games
+    .filter((g: any) => g.win_prob_home && g.status !== "final")
+    .sort((a: any, b: any) => Math.abs(Number(b.win_prob_home) - 0.5) - Math.abs(Number(a.win_prob_home) - 0.5))[0];
+
+  // Find upset watch — scheduled game with closest to 50/50
+  const upsetWatch = games
+    .filter((g: any) => g.win_prob_home && g.status !== "final" && g.upset_risk && (g.upset_risk === "toss-up" || g.upset_risk === "high"))
+    .sort((a: any, b: any) => Math.abs(Number(a.win_prob_home) - 0.5) - Math.abs(Number(b.win_prob_home) - 0.5))[0];
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex items-end justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-3xl font-bold tracking-tight gradient-text">Intelligence Hub</h1>
             <div className="flex items-center gap-1.5 rounded-sm bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">System Active</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Live</span>
             </div>
           </div>
           <p className="text-sm text-text-muted">
-            CourtVision AI — {today} — 2025-26 Season
+            {today} — 2025-26 Season
           </p>
         </div>
+        <div className="hidden sm:flex items-center gap-2">
+          <a href="/studio" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-indigo-400 transition-colors uppercase tracking-wider border border-white/[0.06] rounded px-3 py-1.5">
+            <Sparkles className="h-3 w-3" /> Studio
+          </a>
+          <a href="/ask" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-indigo-400 transition-colors uppercase tracking-wider border border-white/[0.06] rounded px-3 py-1.5">
+            <MessageCircle className="h-3 w-3" /> Ask CV
+          </a>
+        </div>
       </div>
+
+      {/* Hero Row: Best Edge + Upset Watch */}
+      {(bestEdge || upsetWatch) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {bestEdge && (() => {
+            const homeProb = Number(bestEdge.win_prob_home);
+            const awayProb = 1 - homeProb;
+            const favAbbr = homeProb >= 0.5 ? bestEdge.home_abbr : bestEdge.away_abbr;
+            const dogAbbr = homeProb >= 0.5 ? bestEdge.away_abbr : bestEdge.home_abbr;
+            const favProb = Math.max(homeProb, awayProb);
+            const conf = bestEdge.confidence ? Number(bestEdge.confidence) : null;
+            const reasons = bestEdge.key_reasons;
+            const reasonsList = typeof reasons === "string" ? JSON.parse(reasons) : Array.isArray(reasons) ? reasons : [];
+
+            return (
+              <a href={`/games/${bestEdge.id}`} className="block group">
+                <GlassCard variant="accent" className="relative overflow-hidden h-full">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-8 translate-x-8" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="h-4 w-4 text-indigo-400" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Tonight&apos;s Best Edge</span>
+                    </div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="relative h-8 w-8 shrink-0">
+                        <Image src={getTeamLogoByAbbr(favAbbr)} alt={favAbbr} fill className="object-contain" unoptimized />
+                      </div>
+                      <div>
+                        <span className="text-lg font-bold text-text-primary group-hover:text-indigo-400 transition-colors">{favAbbr} over {dogAbbr}</span>
+                        <span className="text-[11px] text-text-muted ml-2 font-stat">{(favProb * 100).toFixed(0)}% win probability</span>
+                      </div>
+                    </div>
+                    {conf && <p className="text-[10px] text-text-muted/50 font-stat mb-2">Confidence: {(conf * 100).toFixed(0)}%</p>}
+                    {reasonsList.length > 0 && (
+                      <p className="text-[11px] text-text-muted/60 leading-relaxed">{reasonsList[0]}</p>
+                    )}
+                  </div>
+                </GlassCard>
+              </a>
+            );
+          })()}
+
+          {upsetWatch && (() => {
+            const homeProb = Number(upsetWatch.win_prob_home);
+            return (
+              <a href={`/games/${upsetWatch.id}`} className="block group">
+                <GlassCard className="relative overflow-hidden h-full border-amber-500/10">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -translate-y-8 translate-x-8" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="h-4 w-4 text-amber-400" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Upset Watch</span>
+                    </div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-1">
+                        <div className="relative h-7 w-7 shrink-0">
+                          <Image src={getTeamLogoByAbbr(upsetWatch.away_abbr)} alt={upsetWatch.away_abbr} fill className="object-contain" unoptimized />
+                        </div>
+                        <span className="text-sm font-bold">{upsetWatch.away_abbr}</span>
+                      </div>
+                      <span className="text-text-muted/30 text-xs">@</span>
+                      <div className="flex items-center gap-1">
+                        <div className="relative h-7 w-7 shrink-0">
+                          <Image src={getTeamLogoByAbbr(upsetWatch.home_abbr)} alt={upsetWatch.home_abbr} fill className="object-contain" unoptimized />
+                        </div>
+                        <span className="text-sm font-bold">{upsetWatch.home_abbr}</span>
+                      </div>
+                    </div>
+                    <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.04] mb-2">
+                      <div className="h-full" style={{ width: `${(1 - homeProb) * 100}%`, background: "rgba(251,191,36,0.3)" }} />
+                      <div className="h-full" style={{ width: `${homeProb * 100}%`, background: "rgba(251,191,36,0.3)" }} />
+                    </div>
+                    <p className="text-[11px] text-text-muted/60">
+                      {(Math.max(homeProb, 1 - homeProb) * 100).toFixed(0)}-{(Math.min(homeProb, 1 - homeProb) * 100).toFixed(0)} split — this one could go either way
+                    </p>
+                  </div>
+                </GlassCard>
+              </a>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Trending Now — Risers + Fallers */}
+      {(risers.length > 0 || fallers.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {risers.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Trending Up</span>
+              </div>
+              <div className="flex gap-2">
+                {risers.map((p: any) => (
+                  <a key={p.id} href={`/players/${p.id}`} className="flex-1 glass-card p-2.5 rounded-lg hover:border-emerald-500/20 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="relative h-7 w-7 shrink-0 rounded-sm overflow-hidden bg-white/[0.04]">
+                        <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.4] translate-y-[1px]" unoptimized />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-text-primary truncate">{p.full_name}</p>
+                        <p className="text-[9px] text-text-muted">{p.team_abbr}</p>
+                      </div>
+                    </div>
+                    <p className="text-right font-stat text-[11px] text-emerald-400 font-bold mt-1">+{Number(p.lfi_delta).toFixed(1)} LFI</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {fallers.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingDown className="h-3.5 w-3.5 text-rose-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">Trending Down</span>
+              </div>
+              <div className="flex gap-2">
+                {fallers.map((p: any) => (
+                  <a key={p.id} href={`/players/${p.id}`} className="flex-1 glass-card p-2.5 rounded-lg hover:border-rose-500/20 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="relative h-7 w-7 shrink-0 rounded-sm overflow-hidden bg-white/[0.04]">
+                        <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.4] translate-y-[1px]" unoptimized />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-text-primary truncate">{p.full_name}</p>
+                        <p className="text-[9px] text-text-muted">{p.team_abbr}</p>
+                      </div>
+                    </div>
+                    <p className="text-right font-stat text-[11px] text-rose-400 font-bold mt-1">{Number(p.lfi_delta).toFixed(1)} LFI</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tonight's Slate */}
       <section>
@@ -98,6 +260,10 @@ export default async function DashboardPage() {
                 <div className="flex items-center justify-between text-[9px] text-text-muted/50 mb-2">
                   {isFinal ? (
                     <span className="text-emerald-400 font-bold">FINAL</span>
+                  ) : game.status === "live" || game.status === "in_progress" ? (
+                    <span className="text-rose-400 font-bold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" /> LIVE
+                    </span>
                   ) : (
                     <span>SCHED</span>
                   )}
@@ -205,7 +371,7 @@ export default async function DashboardPage() {
                         {delta > 0 ? (
                           <TrendingUp className="h-3 w-3 text-emerald-400" />
                         ) : delta < 0 ? (
-                          <TrendingUp className="h-3 w-3 text-rose-400 rotate-180" />
+                          <TrendingDown className="h-3 w-3 text-rose-400" />
                         ) : null}
                         <span className={`font-stat text-[10px] ${delta > 0 ? "text-emerald-400" : delta < 0 ? "text-rose-400" : "text-text-muted"}`}>
                           {delta > 0 ? "+" : ""}{delta.toFixed(1)}
@@ -323,18 +489,37 @@ export default async function DashboardPage() {
             </GlassCard>
           </section>
 
-          {/* Quick Links / System Info */}
-          <GlassCard variant="accent" className="text-center py-6">
+          {/* Quick Links */}
+          <div className="grid grid-cols-2 gap-3">
+            <a href="/studio" className="glass-card p-4 rounded-lg text-center hover:border-indigo-500/20 transition-colors group">
+              <Sparkles className="h-5 w-5 text-indigo-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-[11px] font-semibold text-text-primary">Studio</p>
+              <p className="text-[9px] text-text-muted/50 mt-0.5">Create shareable charts</p>
+            </a>
+            <a href="/ask" className="glass-card p-4 rounded-lg text-center hover:border-indigo-500/20 transition-colors group">
+              <MessageCircle className="h-5 w-5 text-indigo-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-[11px] font-semibold text-text-primary">Ask CV</p>
+              <p className="text-[9px] text-text-muted/50 mt-0.5">Query basketball data</p>
+            </a>
+          </div>
+
+          {/* Engine Info */}
+          <GlassCard variant="accent" className="text-center py-5">
             <BarChart3 className="h-5 w-5 text-indigo-400 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-text-primary mb-1">CourtVision Metrics Engine</p>
-            <p className="text-[11px] text-text-muted leading-relaxed">
-              6 player metrics + 6 team metrics computed from {games.length}+ games and 500+ player stat lines.
+            <p className="text-xs font-semibold text-text-primary mb-1">CourtVision Metrics Engine v2</p>
+            <p className="text-[10px] text-text-muted leading-relaxed">
+              6 player metrics + 6 team metrics · H2H matchups · Live projections at 69% accuracy
             </p>
-            <a href="/methodology" className="inline-block mt-3 text-[10px] text-indigo-400 uppercase tracking-wider hover:underline">
+            <a href="/methodology" className="inline-block mt-2 text-[10px] text-indigo-400 uppercase tracking-wider hover:underline">
               How It Works →
             </a>
           </GlassCard>
         </div>
+      </div>
+
+      {/* Footer watermark */}
+      <div className="text-center py-2">
+        <span className="text-[9px] text-text-muted/20">courtvisionai.io — CourtVision NBA Intelligence Platform</span>
       </div>
     </div>
   );
