@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { X } from "lucide-react";
 import {
   LayoutDashboard,
   Calendar,
@@ -10,34 +11,68 @@ import {
   Trophy,
   GitCompare,
   BookOpen,
+  Activity,
+  Zap,
+  CreditCard,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/games", label: "Games", icon: Calendar },
-  { href: "/teams", label: "Teams", icon: Users },
-  { href: "/players", label: "Players", icon: User },
-  { href: "/leaderboards", label: "Leaderboards", icon: Trophy },
-  { href: "/compare", label: "Compare", icon: GitCompare },
-  { href: "/methodology", label: "Methodology", icon: BookOpen },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, shortcut: "1" },
+  { href: "/games", label: "Games", icon: Calendar, shortcut: "2" },
+  { href: "/teams", label: "Teams", icon: Users, shortcut: "3" },
+  { href: "/players", label: "Players", icon: User, shortcut: "4" },
+  { href: "/leaderboards", label: "Leaderboards", icon: Trophy, shortcut: "5" },
+  { href: "/compare", label: "Compare", icon: GitCompare, shortcut: "6" },
+  { href: "/pulse", label: "Pulse", icon: Zap, shortcut: "7" },
+  { href: "/methodology", label: "Methodology", icon: BookOpen, shortcut: "8" },
+  { href: "/pricing", label: "Pricing", icon: Crown, shortcut: "9" },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
 
-  return (
-    <aside className="flex w-60 flex-col border-r border-border bg-surface">
-      <div className="flex h-14 items-center gap-2 border-b border-border px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
-          <span className="text-sm font-bold text-white">CV</span>
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="flex h-16 items-center justify-between px-6 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3">
+          <div className="relative flex h-9 w-9 items-center justify-center bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+            <Activity className="h-4.5 w-4.5 text-indigo-400" />
+          </div>
+          <div>
+            <span className="text-[15px] font-bold tracking-tight text-text-primary">
+              CourtVision
+            </span>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
+              <p className="text-[9px] font-medium tracking-[0.15em] uppercase text-text-muted/60">
+                Active
+              </p>
+            </div>
+          </div>
         </div>
-        <span className="text-lg font-semibold tracking-tight text-text-primary">
-          CourtVision
-        </span>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1 text-text-muted hover:text-indigo-400 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      {/* Navigation */}
+      <nav className="flex-1 space-y-0.5 px-3 pt-4">
+        <p className="px-3 pb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted/40">
+          Navigation
+        </p>
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -47,25 +82,69 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium transition-all duration-200 rounded-lg",
                 isActive
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                  ? "text-indigo-400 bg-indigo-500/8"
+                  : "text-text-muted hover:text-text-primary hover:bg-white/[0.03]"
               )}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              {/* Active indicator bar */}
+              {isActive && (
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-indigo-400 rounded-full" />
+              )}
+
+              <item.icon className={cn(
+                "h-4 w-4 transition-colors",
+                isActive ? "text-indigo-400" : "text-text-muted group-hover:text-text-secondary"
+              )} />
+              <span className="flex-1">{item.label}</span>
+
+              <span className={cn(
+                "text-[10px] font-mono transition-opacity hidden lg:inline",
+                isActive ? "text-indigo-400/40" : "text-text-muted/30 group-hover:text-text-muted/50"
+              )}>
+                {item.shortcut}
+              </span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-border p-4">
-        <p className="text-xs text-text-muted">
-          Data refreshed daily. Projections update 2h before tip-off.
-        </p>
+      {/* Footer */}
+      <div className="border-t border-white/[0.06] px-5 py-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
+          <p className="text-[11px] text-emerald-400/70 font-mono tracking-wide uppercase">
+            Data: Live
+          </p>
+        </div>
+        <div className="flex items-center justify-between text-[10px] font-mono text-text-muted/40">
+          <span>2025-26 Season</span>
+          <span>v2.1</span>
+        </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden lg:flex w-64 flex-col glass border-r border-white/[0.06]">
+        {sidebarContent}
+      </aside>
+
+      {mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+            onClick={onClose}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col glass border-r border-white/[0.06] lg:hidden animate-slide-in-left">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 }

@@ -163,7 +163,7 @@ export async function getLeaderboard(
 }
 
 function getMetricColumn(metric: string) {
-  const map: Record<string, typeof playerMetricSnapshots.bisScore> = {
+  const map: Record<string, any> = {
     bis: playerMetricSnapshots.bisScore,
     rda: playerMetricSnapshots.rdaScore,
     goi: playerMetricSnapshots.goiScore,

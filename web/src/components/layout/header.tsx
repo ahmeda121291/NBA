@@ -1,31 +1,52 @@
 "use client";
 
-import { Search } from "lucide-react";
-import { useState } from "react";
+import { Bell, Menu } from "lucide-react";
+import { SearchOverlay } from "@/components/shared/search-overlay";
 
-export function Header() {
-  const [searchQuery, setSearchQuery] = useState("");
+interface HeaderProps {
+  onMenuToggle?: () => void;
+  userMenu?: React.ReactNode;
+}
 
+export function Header({ onMenuToggle, userMenu }: HeaderProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-6">
-      <div className="flex items-center gap-4">
-        <h2 className="text-sm font-medium text-text-secondary">
-          NBA Intelligence Platform
-        </h2>
-      </div>
+    <header className="flex flex-col">
+      <div className="flex h-14 items-center justify-between glass px-4 lg:px-6">
+        <div className="flex items-center gap-3">
+          {onMenuToggle && (
+            <button
+              onClick={onMenuToggle}
+              className="lg:hidden p-1.5 text-text-muted hover:text-indigo-400 transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
 
-      <div className="flex items-center gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search players, teams..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-64 rounded-lg border border-border bg-background pl-9 pr-4 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-accent"
-          />
+          <h2 className="hidden sm:block text-[13px] font-medium text-text-muted tracking-wide">
+            NBA Intelligence Platform
+          </h2>
+          <div className="flex items-center gap-2 px-3 py-1 border border-indigo-500/15 bg-indigo-500/5 rounded-md">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-indigo-400/80">
+              2025-26
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block">
+            <SearchOverlay />
+          </div>
+
+          <button className="relative border border-white/[0.08] bg-white/[0.02] p-2 text-text-muted transition-all duration-200 hover:text-indigo-400 hover:border-indigo-500/20 rounded-lg">
+            <Bell className="h-4 w-4" />
+            <div className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,0.5)]" />
+          </button>
+
+          {userMenu}
         </div>
       </div>
+      <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent" />
     </header>
   );
 }

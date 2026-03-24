@@ -8,7 +8,12 @@ if (!connectionString) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-const client = postgres(connectionString);
+// Singleton to prevent connection leaks during Next.js hot reload
+const globalForDb = globalThis as unknown as { pgClient: ReturnType<typeof postgres> };
+
+const client = globalForDb.pgClient ?? postgres(connectionString, { max: 5 });
+if (process.env.NODE_ENV !== "production") globalForDb.pgClient = client;
+
 export const db = drizzle(client, { schema });
 
 export type Database = typeof db;

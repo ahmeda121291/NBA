@@ -283,6 +283,7 @@ export const teamSeasonStats = pgTable(
     homeLosses: integer("home_losses").default(0),
     awayWins: integer("away_wins").default(0),
     awayLosses: integer("away_losses").default(0),
+    eloRating: decimal("elo_rating", { precision: 7, scale: 2 }),
   },
   (table) => [
     uniqueIndex("idx_tss_team_season").on(table.teamId, table.seasonId),
@@ -542,6 +543,63 @@ export const lineups = pgTable(
     uniqueIndex("idx_lineups_hash_date").on(table.lineupHash, table.seasonId, table.asOfDate),
     index("idx_lineups_team").on(table.teamId),
   ]
+);
+
+// ============================================================
+// Users & Subscriptions
+// ============================================================
+
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 255 }).notNull().unique(),
+    name: varchar("name", { length: 255 }),
+    image: text("image"),
+    emailVerified: timestamp("email_verified"),
+    stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
+    subscriptionStatus: varchar("subscription_status", { length: 30 }).default("free"),
+    subscriptionId: varchar("subscription_id", { length: 255 }),
+    subscriptionPriceId: varchar("subscription_price_id", { length: 255 }),
+    subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_users_email").on(table.email),
+    index("idx_users_stripe").on(table.stripeCustomerId),
+  ]
+);
+
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 50 }).notNull(),
+    provider: varchar("provider", { length: 50 }).notNull(),
+    providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
+    refreshToken: text("refresh_token"),
+    accessToken: text("access_token"),
+    expiresAt: integer("expires_at"),
+    tokenType: varchar("token_type", { length: 50 }),
+    scope: text("scope"),
+    idToken: text("id_token"),
+    sessionState: text("session_state"),
+  },
+  (table) => [
+    uniqueIndex("idx_accounts_provider").on(table.provider, table.providerAccountId),
+  ]
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: serial("id").primaryKey(),
+    sessionToken: varchar("session_token", { length: 255 }).notNull().unique(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires").notNull(),
+  }
 );
 
 // ============================================================

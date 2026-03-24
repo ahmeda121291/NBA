@@ -1,173 +1,347 @@
-import { MetricCard } from "@/components/metrics/metric-card";
-import { StreakTag } from "@/components/metrics/streak-tag";
+import Image from "next/image";
+import { GlassCard } from "@/components/ui/glass-card";
+import { ScoreOrb } from "@/components/ui/score-orb";
+import { RadarChart } from "@/components/ui/radar-chart";
+import { ArrowLeft, TrendingUp, Flame, Shield, Activity, Zap, Target, BarChart3, FileText, Swords } from "lucide-react";
+import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
+import { getPlayerWithMetrics, getPlayerGameLogs } from "@/lib/db/queries";
+import { getPlayerMatchupSplits } from "@/lib/db/queries/matchups";
+import { generateScoutingReport } from "@/lib/scouting";
+import { notFound } from "next/navigation";
+import { tierClass, tierLabel, tierBorder, getStreakBadge } from "@/lib/formatting";
 
-const player = {
-  id: 5,
-  name: "Jayson Tatum",
-  team: "BOS",
-  position: "SF",
-  number: "0",
-  height: "6'8\"",
-  weight: "210 lbs",
-  age: 28,
-  experience: "7th season",
-  college: "Duke",
-  status: "Active",
-  nextGame: "vs LAL — Mar 19",
-  seasonStats: {
-    ppg: 27.2, rpg: 8.1, apg: 4.8, spg: 1.1, bpg: 0.7,
-    fgPct: ".472", fg3Pct: ".371", ftPct: ".855", tsPct: ".602",
-    usg: "29.8%", per: 24.8, bpm: 6.1, vorp: 4.2,
-  },
-  metrics: {
-    bis: { score: 82, confidence: 0.88, trend: 1.5, label: "Elite" },
-    rda: { score: 76, confidence: 0.82, trend: 0.5, label: "High-Burden Star" },
-    drs: { score: 65, confidence: 0.75, trend: -0.8, label: "Solid" },
-    lfi: { score: 68, confidence: 0.80, trend: 5.3, label: undefined },
-    sps: { score: 74, confidence: 0.70, trend: 0, label: "Versatile Starter" },
-    goi: { score: 58, confidence: 0.60, trend: 1.2, label: undefined },
-  },
-  streak: "hot_likely_real" as const,
-  projection: {
-    game: "vs LAL — Mar 19",
-    mai: { score: 62, label: "Slight Advantage" },
-    pts: "27 (23-31)",
-    reb: "8 (6-10)",
-    ast: "5 (3-7)",
-    keyFactor: "Favorable size matchup, LAL B2B fatigue",
-  },
-  explanation: `Tatum's BIS of 82 reflects elite two-way impact, placing him in the 94th percentile among all active players. His RDA of 76 confirms a high-difficulty offensive role — 42% of shots unassisted, heavy late-clock creation burden, and significant defensive attention.
+export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const player = await getPlayerWithMetrics(Number(id));
+  if (!player) notFound();
 
-LFI is elevated at 68, driven by TS% up 4.2% over last 10 games against average-quality defense. Streak classified as "likely real" due to stable usage (29.8%) and consistent minutes (35.2 MPG).
+  const p = player as any;
+  const [gameLogs, matchupSplits] = await Promise.all([
+    getPlayerGameLogs(Number(id), 15) as Promise<any[]>,
+    getPlayerMatchupSplits(Number(id)),
+  ]);
 
-Defensive Reality Score of 65 ("Solid") is above average for his position but below elite — primary value is on-ball containment and switchability rather than rim deterrence.`,
-};
+  const bis = p.bis_score ? Number(p.bis_score) : null;
+  const lfi = p.lfi_score ? Number(p.lfi_score) : null;
+  const drs = p.drs_score ? Number(p.drs_score) : null;
+  const rda = p.rda_score ? Number(p.rda_score) : null;
+  const sps = p.sps_score ? Number(p.sps_score) : null;
+  const goi = p.goi_score ? Number(p.goi_score) : null;
+  const lfiDelta = p.lfi_delta ? Number(p.lfi_delta) : 0;
+  const bisConf = p.bis_confidence ? Number(p.bis_confidence) : null;
+  const bisPctl = p.bis_percentile ? Number(p.bis_percentile) : null;
+  const hasMetrics = bis !== null;
 
-export default function PlayerDetailPage() {
+  const radarLabels = ["BIS", "LFI", "DRS", "RDA", "SPS", "GOI"];
+  const radarData = [bis ?? 0, lfi ?? 0, drs ?? 0, rda ?? 0, sps ?? 0, goi ?? 0];
+
+  const metrics = [
+    { key: "BIS", label: "Baseline Impact Score", score: bis, icon: Activity, desc: "Overall per-game value blending offense, defense, and efficiency" },
+    { key: "LFI", label: "Live Form Index", score: lfi, icon: Flame, desc: "Recent form vs season baseline — momentum and trajectory" },
+    { key: "DRS", label: "Defensive Resilience", score: drs, icon: Shield, desc: "Defensive impact: contests, steals, rim protection, versatility" },
+    { key: "RDA", label: "Role-Defined Accuracy", score: rda, icon: Target, desc: "How well the player executes within their assigned team role" },
+    { key: "SPS", label: "Shot Profile Score", score: sps, icon: Zap, desc: "Shot selection efficiency, range, and difficulty adjustment" },
+    { key: "GOI", label: "Game Outcome Influence", score: goi, icon: BarChart3, desc: "Clutch impact on team wins — close games and high-leverage moments" },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-[#007A33] text-2xl font-bold text-white">
-          {player.number}
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{player.name}</h1>
-          <p className="text-sm text-text-secondary">
-            {player.position} — {player.team} — #{player.number}
-          </p>
-          <p className="text-xs text-text-muted">
-            {player.height} {player.weight} | {player.experience} | {player.college}
-          </p>
-          <div className="mt-2">
-            <StreakTag label={player.streak} score={player.metrics.lfi.score} />
+    <div className="space-y-6 animate-fade-in">
+      {/* Back + Header */}
+      <div>
+        <a href="/players" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-indigo-400 transition-colors mb-4">
+          <ArrowLeft className="h-3 w-3" /> Back to Players
+        </a>
+
+        <div className="flex items-start gap-5">
+          <div className="relative h-28 w-28 shrink-0 overflow-hidden bg-white/[0.04] border border-white/[0.06] rounded-xl"
+            style={{
+              boxShadow: `0 8px 32px ${p.team_color || "#818cf8"}30`,
+            }}>
+            <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.3] translate-y-[4px]" unoptimized />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight gradient-text">{p.full_name}</h1>
+              {(() => { const sb = getStreakBadge(p.lfi_streak_label); return sb ? <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${sb.cls}`}>{sb.text}</span> : null; })()}
+            </div>
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="relative h-4 w-4">
+                <Image src={getTeamLogoByAbbr(p.team_abbr)} alt={p.team_abbr} fill className="object-contain" unoptimized />
+              </div>
+              <span className="text-sm text-text-muted">{p.position || "—"} — {p.team_name} ({p.team_abbr})</span>
+              <span className="text-text-muted/20">|</span>
+              <span className="text-sm text-text-muted font-stat">2025-26 Season</span>
+            </div>
+            {hasMetrics && (
+              <div className="flex items-center gap-4 mt-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-text-muted/60 uppercase tracking-wider">BIS</span>
+                  <span className={`font-stat text-lg font-bold ${tierClass(bis)}`}>{bis?.toFixed(0)}</span>
+                </div>
+                {bisPctl && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-text-muted/60 uppercase tracking-wider">Pctl</span>
+                    <span className="font-stat text-sm text-text-secondary">{bisPctl.toFixed(0)}th</span>
+                  </div>
+                )}
+                {bisConf && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-text-muted/60 uppercase tracking-wider">Conf</span>
+                    <span className="font-stat text-sm text-text-secondary">{(bisConf * 100).toFixed(0)}%</span>
+                  </div>
+                )}
+                {lfi !== null && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-text-muted/60 uppercase tracking-wider">LFI</span>
+                    <span className={`font-stat text-sm font-bold ${tierClass(lfi)}`}>{lfi.toFixed(0)}</span>
+                    {lfiDelta !== 0 && (
+                      <span className={`font-stat text-[10px] ${lfiDelta > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {lfiDelta > 0 ? "+" : ""}{lfiDelta.toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {Object.entries(player.metrics).map(([key, m]) => (
-          <MetricCard
-            key={key}
-            metricKey={key}
-            score={m.score}
-            confidence={m.confidence}
-            trend={m.trend}
-            label={m.label}
-          />
-        ))}
-      </div>
-
-      {/* Season Stats */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Season Averages
-        </h2>
-        <div className="mt-3 grid grid-cols-5 gap-4 sm:grid-cols-7 lg:grid-cols-14">
-          {Object.entries(player.seasonStats).map(([key, val]) => (
-            <div key={key}>
-              <p className="text-xs text-text-muted">{key.toUpperCase()}</p>
-              <p className="font-stat text-lg font-bold">{val}</p>
+      {/* CourtVision Metrics Panel */}
+      {hasMetrics && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Radar Chart */}
+          <GlassCard variant="accent" className="lg:col-span-1 flex flex-col items-center justify-center">
+            <h2 className="section-header mb-3 text-[10px]">CourtVision Profile</h2>
+            <RadarChart
+              labels={radarLabels}
+              datasets={[{ label: p.full_name, data: radarData, color: "#818cf8" }]}
+              maxValue={100}
+              size={260}
+            />
+            <div className="mt-2 flex items-center gap-1.5">
+              <ScoreOrb score={bis ?? 0} size="sm" label="BIS" />
             </div>
-          ))}
-        </div>
-      </section>
+          </GlassCard>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Upcoming Projection */}
-        <section className="rounded-xl border border-accent/30 bg-accent/5 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-accent">
-            Upcoming Projection
-          </h2>
-          <p className="mt-1 text-xs text-text-muted">{player.projection.game}</p>
-
-          <div className="mt-3 flex items-center gap-4">
-            <div>
-              <p className="text-xs text-text-muted">MAI</p>
-              <p className="font-stat text-2xl font-bold text-accent">{player.projection.mai.score}</p>
-              <p className="text-xs text-text-secondary">{player.projection.mai.label}</p>
-            </div>
-            <div className="h-12 w-px bg-border" />
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-text-muted">PTS</p>
-                <p className="font-stat text-sm font-bold">{player.projection.pts}</p>
+          {/* Metric Cards Grid */}
+          <div className="lg:col-span-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {metrics.map((m) => (
+              <div key={m.key} className={`p-4 rounded-lg ${tierBorder(m.score)} relative`}
+                >
+                <div className="flex items-center gap-2 mb-2">
+                  <m.icon className="h-3.5 w-3.5 text-text-muted/60" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted/80">{m.key}</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`font-stat text-2xl font-bold ${tierClass(m.score)}`}>
+                    {m.score?.toFixed(0) ?? "—"}
+                  </span>
+                  <span className="text-[9px] text-text-muted/50 uppercase">{tierLabel(m.score)}</span>
+                </div>
+                <p className="text-[10px] text-text-muted/40 mt-1.5 leading-snug">{m.desc}</p>
               </div>
-              <div>
-                <p className="text-xs text-text-muted">REB</p>
-                <p className="font-stat text-sm font-bold">{player.projection.reb}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-muted">AST</p>
-                <p className="font-stat text-sm font-bold">{player.projection.ast}</p>
-              </div>
-            </div>
-          </div>
-
-          <p className="mt-3 text-xs text-text-secondary">
-            Key: {player.projection.keyFactor}
-          </p>
-        </section>
-
-        {/* Rolling Trends Placeholder */}
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-            Rolling Trends
-          </h2>
-          <div className="flex gap-2 mt-2">
-            {[3, 5, 10, 20].map((w) => (
-              <button
-                key={w}
-                className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${
-                  w === 10
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-border text-text-secondary"
-                }`}
-              >
-                Last {w}
-              </button>
             ))}
           </div>
-          <div className="mt-4 flex h-40 items-center justify-center rounded-lg border border-dashed border-border text-sm text-text-muted">
-            Chart: Rolling 10-game PTS/REB/AST trends
-          </div>
-        </section>
-      </div>
+        </div>
+      )}
 
-      {/* Explanation */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Evaluation Explanation
-        </h2>
-        <div className="mt-3 space-y-3">
-          {player.explanation.split("\n\n").map((paragraph, i) => (
-            <p key={i} className="text-sm leading-relaxed text-text-secondary">
-              {paragraph}
-            </p>
+      {/* Season Stats */}
+      <GlassCard>
+        <h2 className="section-header mb-4 text-[10px]">Season Averages</h2>
+        <div className="grid grid-cols-4 gap-4 sm:grid-cols-6 lg:grid-cols-12">
+          {[
+            { label: "GP", val: p.games_played },
+            { label: "GS", val: p.games_started },
+            { label: "MPG", val: Number(p.mpg).toFixed(1) },
+            { label: "PPG", val: Number(p.ppg).toFixed(1), highlight: true },
+            { label: "RPG", val: Number(p.rpg).toFixed(1) },
+            { label: "APG", val: Number(p.apg).toFixed(1) },
+            { label: "SPG", val: Number(p.spg).toFixed(1) },
+            { label: "BPG", val: Number(p.bpg).toFixed(1) },
+            { label: "TOV", val: Number(p.topg).toFixed(1) },
+            { label: "FG%", val: (Number(p.fg_pct) * 100).toFixed(1) },
+            { label: "3P%", val: (Number(p.fg3_pct) * 100).toFixed(1) },
+            { label: "FT%", val: (Number(p.ft_pct) * 100).toFixed(1) },
+          ].map((s) => (
+            <div key={s.label} className="text-center">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/60">{s.label}</p>
+              <p className={`font-stat text-lg font-bold mt-0.5 ${s.highlight ? "text-indigo-400" : ""}`}>{s.val}</p>
+            </div>
           ))}
         </div>
-      </section>
+      </GlassCard>
+
+      {/* AI Scouting Report */}
+      {hasMetrics && (() => {
+        const report = generateScoutingReport({
+          full_name: p.full_name,
+          position: p.position || "—",
+          team_abbr: p.team_abbr,
+          team_name: p.team_name,
+          games_played: Number(p.games_played),
+          ppg: Number(p.ppg), rpg: Number(p.rpg), apg: Number(p.apg),
+          spg: Number(p.spg), bpg: Number(p.bpg), topg: Number(p.topg),
+          mpg: Number(p.mpg), fg_pct: Number(p.fg_pct), fg3_pct: Number(p.fg3_pct), ft_pct: Number(p.ft_pct),
+          bis_score: bis, bis_percentile: bisPctl, lfi_score: lfi, lfi_delta: lfiDelta,
+          lfi_streak_label: p.lfi_streak_label, drs_score: drs, rda_score: rda, sps_score: sps, goi_score: goi,
+        });
+        return (
+          <GlassCard variant="accent">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="h-4 w-4 text-indigo-400" />
+              <h2 className="section-header text-[10px]">CourtVision Scouting Report</h2>
+            </div>
+            <p className="text-sm font-semibold text-text-primary mb-3">{report.headline}</p>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {report.tags.map((tag) => (
+                <span key={tag} className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <div className="space-y-4">
+              {report.sections.map((section) => (
+                <div key={section.title}>
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60 mb-1">{section.title}</h3>
+                  <p className="text-[12px] leading-relaxed text-text-secondary">{section.content}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-white/[0.04]">
+              <p className="text-[9px] text-text-muted/30 italic">Generated by CourtVision Intelligence Engine — based on current season metrics and game logs</p>
+            </div>
+          </GlassCard>
+        );
+      })()}
+
+      {/* Opponent Splits — Player H2H Matchups */}
+      {matchupSplits.length > 0 && (
+        <GlassCard hover={false} padding="sm">
+          <div className="flex items-center gap-2 px-3 pt-2 mb-3">
+            <Swords className="h-4 w-4 text-indigo-400" />
+            <h2 className="section-header text-[10px]">Opponent Splits</h2>
+            <span className="text-[9px] text-text-muted/40 ml-auto">vs season avg</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
+                  <th className="px-3 py-2">Opponent</th>
+                  <th className="px-2 py-2 text-right">GP</th>
+                  <th className="px-2 py-2 text-right">PTS</th>
+                  <th className="px-2 py-2 text-right">+/-</th>
+                  <th className="px-2 py-2 text-right">REB</th>
+                  <th className="px-2 py-2 text-right">AST</th>
+                  <th className="px-2 py-2 text-right">FG%</th>
+                  <th className="px-2 py-2 text-right">3P%</th>
+                  <th className="px-2 py-2 text-right">MIN</th>
+                  <th className="px-2 py-2 text-right">Matchup</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matchupSplits.map((ms) => {
+                  const ptsDiffColor = ms.pts_diff > 3 ? "text-emerald-400" : ms.pts_diff < -3 ? "text-rose-400" : "text-text-muted";
+                  const matchupLabel = ms.pts_diff > 5 ? "Dominates" : ms.pts_diff > 2 ? "Favorable" : ms.pts_diff < -5 ? "Struggles" : ms.pts_diff < -2 ? "Tough" : "Neutral";
+                  const matchupCls = ms.pts_diff > 5 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    : ms.pts_diff > 2 ? "text-emerald-400/70 bg-emerald-500/5 border-emerald-500/10"
+                    : ms.pts_diff < -5 ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+                    : ms.pts_diff < -2 ? "text-rose-400/70 bg-rose-500/5 border-rose-500/10"
+                    : "text-text-muted/60 bg-white/[0.02] border-white/[0.04]";
+
+                  return (
+                    <tr key={ms.opponent_team_id} className="border-b border-white/[0.03] table-row-hover">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative h-4 w-4">
+                            <Image src={getTeamLogoByAbbr(ms.opponent_abbr)} alt={ms.opponent_abbr} fill className="object-contain" unoptimized />
+                          </div>
+                          <span className="text-[11px] font-semibold text-text-primary">{ms.opponent_abbr}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 text-right font-stat text-[11px] text-text-muted">{ms.games}</td>
+                      <td className="px-2 py-2 text-right font-stat text-[12px] font-bold text-text-primary">{ms.avg_pts}</td>
+                      <td className={`px-2 py-2 text-right font-stat text-[11px] font-semibold ${ptsDiffColor}`}>
+                        {ms.pts_diff > 0 ? "+" : ""}{ms.pts_diff}
+                      </td>
+                      <td className="px-2 py-2 text-right font-stat text-[11px] text-text-secondary">{ms.avg_reb}</td>
+                      <td className="px-2 py-2 text-right font-stat text-[11px] text-text-secondary">{ms.avg_ast}</td>
+                      <td className="px-2 py-2 text-right font-stat text-[11px] text-text-secondary">{(ms.fg_pct * 100).toFixed(1)}</td>
+                      <td className="px-2 py-2 text-right font-stat text-[11px] text-text-secondary">{(ms.fg3_pct * 100).toFixed(1)}</td>
+                      <td className="px-2 py-2 text-right font-stat text-[11px] text-text-muted">{ms.avg_min}</td>
+                      <td className="px-2 py-2 text-right">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${matchupCls}`}>
+                          {matchupLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Recent Game Logs */}
+      {gameLogs.length > 0 && (
+        <GlassCard hover={false} padding="sm">
+          <h2 className="section-header mb-3 px-3 pt-2 text-[10px]">Recent Game Log</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Opp</th>
+                  <th className="px-3 py-2 text-right">MIN</th>
+                  <th className="px-3 py-2 text-right">PTS</th>
+                  <th className="px-3 py-2 text-right">REB</th>
+                  <th className="px-3 py-2 text-right">AST</th>
+                  <th className="px-3 py-2 text-right">STL</th>
+                  <th className="px-3 py-2 text-right">BLK</th>
+                  <th className="px-3 py-2 text-right">FG</th>
+                  <th className="px-3 py-2 text-right">3P</th>
+                  <th className="px-3 py-2 text-right">+/-</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gameLogs.map((gl: any, i: number) => {
+                  const pts = Number(gl.pts);
+                  const avgPts = Number(p.ppg);
+                  const isHotGame = pts >= avgPts * 1.3;
+                  const isColdGame = pts <= avgPts * 0.5;
+                  return (
+                    <tr key={i} className="border-b border-white/[0.03] table-row-hover">
+                      <td className="px-3 py-2 text-[11px] text-text-muted">{gl.game_date}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative h-4 w-4">
+                            <Image src={getTeamLogoByAbbr(gl.opp_abbr)} alt={gl.opp_abbr} fill className="object-contain" unoptimized />
+                          </div>
+                          <span className="text-[11px] text-text-muted">{gl.opp_abbr}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{Number(gl.minutes).toFixed(0)}</td>
+                      <td className={`px-3 py-2 text-right font-stat font-bold ${isHotGame ? "text-emerald-400" : isColdGame ? "text-rose-400" : "text-text-primary"}`}>
+                        {gl.pts}
+                      </td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{gl.reb}</td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{gl.ast}</td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{gl.stl}</td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{gl.blk}</td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{gl.fgm}-{gl.fga}</td>
+                      <td className="px-3 py-2 text-right font-stat text-[12px] text-text-secondary">{gl.fg3m}-{gl.fg3a}</td>
+                      <td className={`px-3 py-2 text-right font-stat text-[12px] font-semibold ${Number(gl.plus_minus) > 0 ? "text-emerald-400" : Number(gl.plus_minus) < 0 ? "text-rose-400" : "text-text-muted"}`}>
+                        {Number(gl.plus_minus) > 0 ? "+" : ""}{gl.plus_minus}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
     </div>
   );
 }

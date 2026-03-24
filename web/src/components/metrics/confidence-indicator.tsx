@@ -14,25 +14,27 @@ const dotCount: Record<ConfidenceLevel, number> = {
 };
 
 const dotColors: Record<ConfidenceLevel, string> = {
-  high: "bg-emerald-400",
-  moderate: "bg-blue-400",
-  low: "bg-amber-400",
-  very_low: "bg-rose-400",
+  high: "bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.5)]",
+  moderate: "bg-blue-400 shadow-[0_0_4px_rgba(59,130,246,0.5)]",
+  low: "bg-amber-400 shadow-[0_0_4px_rgba(245,158,11,0.5)]",
+  very_low: "bg-rose-400 shadow-[0_0_4px_rgba(244,63,94,0.5)]",
 };
+
+const inactiveColor = "bg-white/[0.06]";
 
 export function ConfidenceIndicator({ level, size = "md" }: ConfidenceIndicatorProps) {
   const active = dotCount[level];
   const total = 4;
 
   return (
-    <div className="flex items-center gap-0.5" title={`${level} confidence`}>
+    <div className="flex items-center gap-1" title={`${level} confidence`}>
       {Array.from({ length: total }, (_, i) => (
         <div
           key={i}
           className={cn(
-            "rounded-full",
+            "rounded-full transition-all duration-300",
             size === "sm" ? "h-1 w-1" : "h-1.5 w-1.5",
-            i < active ? dotColors[level] : "bg-border"
+            i < active ? dotColors[level] : inactiveColor
           )}
         />
       ))}

@@ -46,7 +46,7 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
   let cursor = 0;
   do {
     const result = await redis.scan(cursor, { match: `${prefix}*`, count: 100 });
-    cursor = result[0];
+    cursor = Number(result[0]);
     const keys = result[1];
     if (keys.length > 0) {
       await redis.del(...keys);

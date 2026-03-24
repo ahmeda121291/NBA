@@ -1,247 +1,617 @@
-import { WinProbBar } from "@/components/shared/win-prob-bar";
+import Image from "next/image";
+import { GlassCard } from "@/components/ui/glass-card";
+import { MetricTooltip } from "@/components/shared/metric-tooltip";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { ArrowLeft, Activity, Target, TrendingUp, AlertTriangle, Check, X, Zap, Swords } from "lucide-react";
+import { getTeamLogoByAbbr } from "@/lib/nba-data";
+import { getGameById, getTeamWithMetrics, getGameProjection, getGamePlayerProjections, getGamePlayerLogs } from "@/lib/db/queries";
+import { getGameKeyMatchups } from "@/lib/db/queries/matchups";
+import { computeLiveProjections, computeLivePlayerProjections } from "@/lib/projections";
+import { notFound } from "next/navigation";
+import { tierClass } from "@/lib/formatting";
 
-// Placeholder — will be fetched from API
-const game = {
-  id: 1,
-  time: "7:00 PM ET",
-  date: "Mar 19, 2026",
-  arena: "TD Garden",
-  home: { abbr: "BOS", name: "Celtics", record: "42-20", tsc: 78, ltfi: 68 },
-  away: { abbr: "LAL", name: "Lakers", record: "35-28", tsc: 65, ltfi: 52 },
-  projection: {
-    winner: "BOS",
-    homeProb: 0.58,
-    projScoreHome: "114",
-    projScoreAway: "108",
-    scoreRange: 6,
-    pace: 100.2,
-    confidence: 0.72,
-    margin: 6,
-    upsetRisk: "low" as const,
-    keyReasons: [
-      "BOS home court advantage (+3.8 pts)",
-      "LAL on second night of back-to-back",
-      "BOS stronger recent form (LTFI 68 vs 52)",
-      "If AD plays, gap narrows to ~52% BOS",
-    ],
-  },
-  styleClash: [
-    { factor: "Pace", home: 101.4, away: 99.1, edge: "BOS", note: "BOS tempo likely" },
-    { factor: "Paint scoring", home: 44.8, away: 52.1, edge: "LAL", note: "LAL paint advantage" },
-    { factor: "3PT rate", home: 0.392, away: 0.34, edge: "BOS", note: "BOS perimeter volume" },
-    { factor: "Transition", home: 16.1, away: 14.2, edge: "BOS", note: "BOS fast break edge" },
-  ],
-  injuries: [
-    { player: "Anthony Davis", team: "LAL", status: "Questionable", impact: "-3.2 net rating if out" },
-  ],
-  matchups: [
-    { away: "LeBron James", home: "Jayson Tatum", maiAway: 48, label: "Neutral" },
-    { away: "Austin Reaves", home: "Derrick White", maiAway: 55, label: "Slight edge Reaves" },
-    { away: "Anthony Davis", home: "Kristaps Porzingis", maiAway: 52, label: "Neutral" },
-  ],
-  projectedStats: [
-    { name: "Jayson Tatum", team: "BOS", min: 36, pts: "27 (23-31)", reb: "8 (6-10)", ast: "5 (3-7)", usg: "30.1%" },
-    { name: "Jaylen Brown", team: "BOS", min: 35, pts: "23 (19-27)", reb: "5 (3-7)", ast: "3 (2-5)", usg: "25.4%" },
-    { name: "LeBron James", team: "LAL", min: 35, pts: "25 (21-29)", reb: "7 (5-9)", ast: "7 (5-9)", usg: "28.8%" },
-    { name: "Anthony Davis", team: "LAL", min: 34, pts: "24 (20-28)", reb: "10 (8-13)", ast: "3 (2-5)", usg: "26.5%" },
-    { name: "Kristaps Porzingis", team: "BOS", min: 30, pts: "19 (15-23)", reb: "7 (5-9)", ast: "2 (1-3)", usg: "21.2%" },
-    { name: "Derrick White", team: "BOS", min: 32, pts: "15 (11-19)", reb: "4 (2-6)", ast: "4 (2-6)", usg: "18.5%" },
-  ],
-};
+export const dynamic = "force-dynamic";
 
-export default function GameDetailPage() {
+function BoxScoreTable({ players, teamAbbr, teamId }: { players: any[]; teamAbbr: string; teamId: number }) {
+  const teamPlayers = players.filter((p: any) => Number(p.team_id) === teamId);
+  if (teamPlayers.length === 0) return null;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="relative h-5 w-5">
+          <Image src={getTeamLogoByAbbr(teamAbbr)} alt={teamAbbr} fill className="object-contain" unoptimized />
+        </div>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">{teamAbbr}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.04]">
+              <th className="px-3 py-1.5 text-left text-[9px] uppercase tracking-widest text-text-muted/40">Player</th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="min">MIN</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40 font-bold"><MetricTooltip metricKey="ppg">PTS</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="reb">REB</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="ast">AST</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="stl">STL</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="blk">BLK</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="tov">TOV</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="fg">FG</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="fg3">3P</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="ft">FT</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="plus_minus">+/-</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-indigo-400/40"><MetricTooltip metricKey="bis">BIS</MetricTooltip></th>
+            </tr>
+          </thead>
+          <tbody>
+            {teamPlayers.map((p: any, i: number) => {
+              const bis = p.bis_score ? Number(p.bis_score) : null;
+              const fgPct = p.fga > 0 ? ((Number(p.fgm) / Number(p.fga)) * 100).toFixed(0) : "—";
+              return (
+                <tr key={i} className="border-b border-white/[0.03] table-row-hover">
+                  <td className="px-3 py-1.5">
+                    <a href={`/players/${p.player_id}`} className="hover:text-indigo-400 transition-colors">
+                      <span className="text-[12px] font-semibold text-text-primary">{p.full_name}</span>
+                      <span className="text-[10px] text-text-muted/40 ml-1">{p.position}</span>
+                    </a>
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-muted/50">{p.minutes}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[12px] font-bold text-text-primary">{p.pts}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-secondary">{p.reb}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-secondary">{p.ast}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-secondary">{p.stl}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-secondary">{p.blk}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-muted/50">{p.tov ?? 0}</td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-muted/60">
+                    {p.fgm}/{p.fga} <span className="text-text-muted/30">({fgPct}%)</span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-muted/60">
+                    {p.fg3m}/{p.fg3a}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-stat text-[11px] text-text-muted/60">
+                    {p.ftm}/{p.fta}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right font-stat text-[11px] ${
+                    Number(p.plus_minus) > 0 ? "text-emerald-400" : Number(p.plus_minus) < 0 ? "text-rose-400" : "text-text-muted/50"
+                  }`}>
+                    {Number(p.plus_minus) > 0 ? "+" : ""}{p.plus_minus}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right font-stat text-[11px] font-bold ${tierClass(bis)}`}>
+                    {bis?.toFixed(0) ?? "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const game = await getGameById(Number(id));
+  if (!game) notFound();
+
+  const g = game as any;
+  const homePts = g.home_score != null ? Number(g.home_score) : null;
+  const awayPts = g.away_score != null ? Number(g.away_score) : null;
+  const isFinal = g.status === "final" && homePts != null && awayPts != null;
+  const homeWon = isFinal && homePts! > awayPts!;
+  const awayWon = isFinal && awayPts! > homePts!;
+  const displayDate = new Date(g.game_date + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
+  });
+
+  const [homeTeam, awayTeam, preProjection, prePlayerProjections, playerLogs, keyMatchups] = await Promise.all([
+    getTeamWithMetrics(Number(g.home_team_id)),
+    getTeamWithMetrics(Number(g.away_team_id)),
+    getGameProjection(Number(id)),
+    getGamePlayerProjections(Number(id)),
+    getGamePlayerLogs(Number(id), 30),
+    getGameKeyMatchups(Number(id)),
+  ]);
+
+  const ht = homeTeam as any;
+  const at = awayTeam as any;
+
+  // Use pre-computed projection if available, otherwise compute live
+  let proj = preProjection as any;
+  let pProj = prePlayerProjections as any[];
+
+  if (!proj && !isFinal) {
+    // Compute live projection for this scheduled game
+    const liveMap = await computeLiveProjections([Number(id)]);
+    const liveProj = liveMap.get(Number(id));
+    if (liveProj) {
+      proj = {
+        ...liveProj,
+        winner_abbr: liveProj.winner_abbr,
+        winner_name: liveProj.winner_abbr, // abbreviated for now
+      };
+    }
+  }
+
+  if (pProj.length === 0 && !isFinal) {
+    // Compute live player projections
+    const livePlayers = await computeLivePlayerProjections(Number(id));
+    pProj = livePlayers as any[];
+  }
+
+  const pLogs = playerLogs as any[];
+
+  const homeTSC = ht?.tsc_score ? Number(ht.tsc_score) : null;
+  const awayTSC = at?.tsc_score ? Number(at.tsc_score) : null;
+  const homeLTFI = ht?.ltfi_score ? Number(ht.ltfi_score) : null;
+  const awayLTFI = at?.ltfi_score ? Number(at.ltfi_score) : null;
+  const homeLSS = ht?.lss_score ? Number(ht.lss_score) : null;
+  const awayLSS = at?.lss_score ? Number(at.lss_score) : null;
+  const homeDRS = ht?.drs_team_score ? Number(ht.drs_team_score) : null;
+  const awayDRS = at?.drs_team_score ? Number(at.drs_team_score) : null;
+
+  const metricComparisons = [
+    { label: "TSC", key: "tsc", home: homeTSC, away: awayTSC },
+    { label: "LTFI", key: "ltfi", home: homeLTFI, away: awayLTFI },
+    { label: "LSS", key: "lss", home: homeLSS, away: awayLSS },
+    { label: "DRS", key: "drs_team", home: homeDRS, away: awayDRS },
+  ];
+
+  const hasProj = !!proj;
+  const homeProb = hasProj ? Number(proj.win_prob_home) : null;
+  const awayProb = hasProj ? Number(proj.win_prob_away) : null;
+  const projScoreHome = hasProj ? Number(proj.proj_score_home) : null;
+  const projScoreAway = hasProj ? Number(proj.proj_score_away) : null;
+  const projWinnerId = proj?.projected_winner_id ? Number(proj.projected_winner_id) : null;
+  const confidence = proj?.confidence ? Number(proj.confidence) : null;
+  const upsetRisk = proj?.upset_risk;
+  const rawReasons = proj?.key_reasons;
+  const keyReasons: string[] | null = rawReasons
+    ? (typeof rawReasons === "string" ? JSON.parse(rawReasons) : Array.isArray(rawReasons) ? rawReasons : null)
+    : null;
+  const favoredAbbr = proj?.winner_abbr;
+
+  const pickCorrect = isFinal && projWinnerId
+    ? (homeWon && projWinnerId === Number(g.home_team_id)) || (awayWon && projWinnerId === Number(g.away_team_id))
+    : null;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Back nav */}
       <div>
-        <p className="text-sm text-text-muted">
-          {game.date} — {game.time} — {game.arena}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">
-          {game.away.abbr} @ {game.home.abbr}
-        </h1>
-      </div>
-
-      {/* Projection Hero */}
-      <div className="rounded-xl border border-accent/30 bg-accent/5 p-6">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-accent">Projected Winner</span>
-          <span className="text-2xl font-bold">{game.projection.winner}</span>
-          <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs text-text-secondary">
-            {game.projection.confidence >= 0.7 ? "High" : "Moderate"} confidence
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-6">
+        <a href="/games" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-indigo-400 transition-colors mb-3">
+          <ArrowLeft className="h-3 w-3" /> Back to Games
+        </a>
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-text-muted">Win Probability</p>
-            <div className="mt-1">
-              <WinProbBar
-                homeProb={game.projection.homeProb}
-                homeLabel={game.home.abbr}
-                awayLabel={game.away.abbr}
-              />
-            </div>
+            <p className="text-[11px] text-text-muted font-stat">{displayDate}</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight gradient-text">
+              {g.away_abbr} @ {g.home_abbr}
+            </h1>
           </div>
-          <div>
-            <p className="text-xs text-text-muted">Projected Score</p>
-            <p className="font-stat text-xl font-bold">
-              {game.projection.projScoreAway}-{game.projection.projScoreHome}
-              <span className="ml-1 text-sm text-text-muted">(±{game.projection.scoreRange})</span>
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-text-muted">Projected Pace</p>
-            <p className="font-stat text-xl font-bold">{game.projection.pace}</p>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <p className="text-xs font-medium text-text-secondary">Key Factors</p>
-          <ul className="mt-1 space-y-1">
-            {game.projection.keyReasons.map((reason) => (
-              <li key={reason} className="text-sm text-text-secondary">
-                • {reason}
-              </li>
-            ))}
-          </ul>
+          {!isFinal && (
+            <AutoRefresh
+              intervalSeconds={g.status === "live" || g.status === "in_progress" ? 30 : 60}
+              enabled={true}
+              label={g.status === "live" || g.status === "in_progress" ? "Live updates" : "Pre-game"}
+            />
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Style Clash */}
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-            Style Clash
-          </h2>
-          <div className="mt-3 space-y-3">
-            {game.styleClash.map((item) => (
-              <div key={item.factor} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="w-24 text-xs text-text-muted">{item.factor}</span>
-                  <span className="font-stat text-sm">{game.away.abbr} {item.away}</span>
-                </div>
-                <span className="text-xs text-text-muted">vs</span>
-                <div className="flex items-center gap-3">
-                  <span className="font-stat text-sm">{item.home} {game.home.abbr}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      item.edge === game.home.abbr
-                        ? "bg-accent/15 text-accent"
-                        : "bg-amber-500/15 text-amber-400"
-                    }`}
+      {/* Score Hero */}
+      <GlassCard variant="accent" padding="lg" className="relative overflow-hidden">
+        <div className="relative">
+          {isFinal ? (
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <span className="rounded-sm bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Final</span>
+                {hasProj && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border rounded-sm"
+                    style={{
+                      borderColor: pickCorrect ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.3)",
+                      background: pickCorrect ? "rgba(16,185,129,0.08)" : "rgba(244,63,94,0.08)",
+                      color: pickCorrect ? "#10b981" : "#f43f5e",
+                    }}
                   >
-                    {item.note}
+                    <Target className="h-2.5 w-2.5" />
+                    Pick: {favoredAbbr} {pickCorrect ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
                   </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6">
+                <div className="text-center">
+                  <div className="flex justify-center mb-3">
+                    <div className="relative h-20 w-20">
+                      <Image src={getTeamLogoByAbbr(g.away_abbr)} alt={g.away_name} fill className="object-contain drop-shadow-xl" unoptimized />
+                    </div>
+                  </div>
+                  <p className={`text-xl font-bold ${awayWon ? "text-emerald-400" : "text-text-primary"}`}>{g.away_city} {g.away_name}</p>
+                  <p className="text-xs text-text-muted font-stat mt-1">{g.away_wins}-{g.away_losses}</p>
+                  {awayTSC && <p className={`font-stat text-[10px] mt-1 ${tierClass(awayTSC)}`}>TSC {awayTSC.toFixed(0)}</p>}
+                </div>
+
+                <div className="text-center">
+                  <p className="font-stat text-5xl font-bold text-text-primary tracking-tight">
+                    {awayPts} <span className="text-text-muted/20">-</span> {homePts}
+                  </p>
+                  <p className={`mt-2 text-sm font-semibold ${awayWon ? "text-emerald-400" : homeWon ? "text-emerald-400" : ""}`}>
+                    {awayWon ? `${g.away_name} Win` : homeWon ? `${g.home_name} Win` : "Tied"}
+                  </p>
+                  {hasProj && (
+                    <p className="text-[10px] text-text-muted/40 mt-1 font-stat">
+                      Projected: {projScoreAway}-{projScoreHome}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-center">
+                  <div className="flex justify-center mb-3">
+                    <div className="relative h-20 w-20">
+                      <Image src={getTeamLogoByAbbr(g.home_abbr)} alt={g.home_name} fill className="object-contain drop-shadow-xl" unoptimized />
+                    </div>
+                  </div>
+                  <p className={`text-xl font-bold ${homeWon ? "text-emerald-400" : "text-text-primary"}`}>{g.home_city} {g.home_name}</p>
+                  <p className="text-xs text-text-muted font-stat mt-1">{g.home_wins}-{g.home_losses}</p>
+                  {homeTSC && <p className={`font-stat text-[10px] mt-1 ${tierClass(homeTSC)}`}>TSC {homeTSC.toFixed(0)}</p>}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Injury Impact */}
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-            Injury Impact
-          </h2>
-          {game.injuries.length > 0 ? (
-            <div className="mt-3 space-y-3">
-              {game.injuries.map((inj) => (
-                <div
-                  key={inj.player}
-                  className="flex items-center justify-between rounded-lg bg-background p-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{inj.player}</p>
-                    <p className="text-xs text-text-muted">{inj.team}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-400">
-                      {inj.status}
-                    </span>
-                    <p className="mt-1 text-xs text-text-muted">{inj.impact}</p>
-                  </div>
-                </div>
-              ))}
             </div>
           ) : (
-            <p className="mt-3 text-sm text-text-muted">No significant injuries affecting this game.</p>
+            <div className="text-center py-4">
+              <span className="rounded-sm bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-[10px] font-bold text-blue-400 uppercase tracking-wider">Scheduled</span>
+              <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-8">
+                <div className="text-center">
+                  <div className="flex justify-center mb-3">
+                    <div className="relative h-20 w-20">
+                      <Image src={getTeamLogoByAbbr(g.away_abbr)} alt={g.away_name} fill className="object-contain drop-shadow-xl" unoptimized />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold">{g.away_city} {g.away_name}</p>
+                  <p className="text-xs text-text-muted font-stat mt-1">{g.away_wins}-{g.away_losses}</p>
+                  {awayTSC && <p className={`font-stat text-[10px] mt-1 ${tierClass(awayTSC)}`}>TSC {awayTSC.toFixed(0)}</p>}
+                </div>
+                <div className="text-center">
+                  {hasProj ? (
+                    <>
+                      <p className="font-stat text-3xl font-bold text-text-muted/50">
+                        {projScoreAway} <span className="text-text-muted/15">-</span> {projScoreHome}
+                      </p>
+                      <p className="text-[9px] uppercase tracking-widest text-indigo-400/50 font-semibold mt-1">Projected</p>
+                    </>
+                  ) : (
+                    <p className="text-2xl font-bold text-text-muted/30">VS</p>
+                  )}
+                </div>
+                <div className="text-center">
+                  <div className="flex justify-center mb-3">
+                    <div className="relative h-20 w-20">
+                      <Image src={getTeamLogoByAbbr(g.home_abbr)} alt={g.home_name} fill className="object-contain drop-shadow-xl" unoptimized />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold">{g.home_city} {g.home_name}</p>
+                  <p className="text-xs text-text-muted font-stat mt-1">{g.home_wins}-{g.home_losses}</p>
+                  {homeTSC && <p className={`font-stat text-[10px] mt-1 ${tierClass(homeTSC)}`}>TSC {homeTSC.toFixed(0)}</p>}
+                </div>
+              </div>
+            </div>
           )}
-        </section>
+        </div>
+      </GlassCard>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* CourtVision Projection */}
+        {hasProj && (
+          <GlassCard>
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="h-3.5 w-3.5 text-indigo-400" />
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">CourtVision Projection</h2>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-[11px] font-stat mb-1.5">
+                <span className={awayProb! > homeProb! ? "text-indigo-400 font-bold" : "text-text-muted/50"}>
+                  {g.away_abbr} {(awayProb! * 100).toFixed(0)}%
+                </span>
+                <span className={homeProb! > awayProb! ? "text-indigo-400 font-bold" : "text-text-muted/50"}>
+                  {(homeProb! * 100).toFixed(0)}% {g.home_abbr}
+                </span>
+              </div>
+              <div className="flex h-2 rounded-sm overflow-hidden bg-white/[0.04]">
+                <div className="h-full" style={{
+                  width: `${awayProb! * 100}%`,
+                  background: awayProb! > homeProb!
+                    ? "linear-gradient(90deg, rgba(129,140,248,0.5), rgba(129,140,248,0.25))"
+                    : "rgba(128,148,176,0.15)",
+                }} />
+                <div className="h-full" style={{
+                  width: `${homeProb! * 100}%`,
+                  background: homeProb! > awayProb!
+                    ? "linear-gradient(270deg, rgba(129,140,248,0.5), rgba(129,140,248,0.25))"
+                    : "rgba(128,148,176,0.15)",
+                }} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="text-center p-2 border border-white/[0.04] rounded">
+                <p className="text-[9px] text-text-muted/50 uppercase tracking-wider mb-1">{g.away_abbr} Projected</p>
+                <p className="font-stat text-lg font-bold text-text-primary">{projScoreAway}</p>
+                {proj.proj_score_away_low && (
+                  <p className="text-[10px] text-text-muted/40 font-stat">
+                    {Number(proj.proj_score_away_low)}-{Number(proj.proj_score_away_high)}
+                  </p>
+                )}
+              </div>
+              <div className="text-center p-2 border border-white/[0.04] rounded">
+                <p className="text-[9px] text-text-muted/50 uppercase tracking-wider mb-1">{g.home_abbr} Projected</p>
+                <p className="font-stat text-lg font-bold text-text-primary">{projScoreHome}</p>
+                {proj.proj_score_home_low && (
+                  <p className="text-[10px] text-text-muted/40 font-stat">
+                    {Number(proj.proj_score_home_low)}-{Number(proj.proj_score_home_high)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              {confidence != null && (
+                <span className="px-2 py-0.5 text-[10px] font-bold font-stat border border-white/[0.06] text-text-muted/60 rounded-sm">
+                  Confidence: {(confidence * 100).toFixed(0)}%
+                </span>
+              )}
+              {upsetRisk && (
+                <span className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold border rounded-sm ${
+                  upsetRisk === "toss-up" ? "text-amber-400 border-amber-400/20" :
+                  upsetRisk === "moderate" ? "text-orange-400 border-orange-400/20" :
+                  "text-text-muted/50 border-white/[0.06]"
+                }`}>
+                  {upsetRisk === "toss-up" && <AlertTriangle className="h-2.5 w-2.5" />}
+                  Upset Risk: {upsetRisk}
+                </span>
+              )}
+            </div>
+
+            {keyReasons && keyReasons.length > 0 && (
+              <div className="space-y-1.5">
+                {keyReasons.map((reason: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-text-muted/70">
+                    <TrendingUp className="h-3 w-3 mt-0.5 text-indigo-400/40 shrink-0" />
+                    <span>{reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
+        )}
+
+        {/* CourtVision Metric Comparison */}
+        {(homeTSC || awayTSC) && (
+          <GlassCard>
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="h-3.5 w-3.5 text-indigo-400" />
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Matchup Analysis</h2>
+            </div>
+            <div className="space-y-3">
+              {metricComparisons.map((m) => {
+                if (!m.home && !m.away) return null;
+                const homeVal = m.home ?? 0;
+                const awayVal = m.away ?? 0;
+                const total = homeVal + awayVal || 1;
+                const homeEdge = homeVal > awayVal;
+                return (
+                  <div key={m.label} className="flex items-center gap-4">
+                    <div className="w-16 text-right">
+                      <span className={`font-stat text-sm font-bold ${homeEdge ? tierClass(m.home) : "text-text-muted"}`}>
+                        {m.home?.toFixed(0) ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex h-2 rounded-sm overflow-hidden bg-white/[0.04]">
+                        <div className="h-full transition-all" style={{
+                          width: `${(homeVal / total) * 100}%`,
+                          background: homeEdge ? "linear-gradient(90deg, rgba(129,140,248,0.4), rgba(129,140,248,0.2))" : "rgba(128,148,176,0.2)",
+                        }} />
+                        <div className="h-full transition-all" style={{
+                          width: `${(awayVal / total) * 100}%`,
+                          background: !homeEdge ? "linear-gradient(270deg, rgba(129,140,248,0.4), rgba(129,140,248,0.2))" : "rgba(128,148,176,0.2)",
+                        }} />
+                      </div>
+                      <p className="text-center text-[9px] text-text-muted/50 mt-0.5 uppercase tracking-widest font-bold">
+                        <MetricTooltip metricKey={m.key}>{m.label}</MetricTooltip>
+                      </p>
+                    </div>
+                    <div className="w-16">
+                      <span className={`font-stat text-sm font-bold ${!homeEdge ? tierClass(m.away) : "text-text-muted"}`}>
+                        {m.away?.toFixed(0) ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between mt-4 text-[10px] text-text-muted/50 uppercase tracking-wider">
+              <span>{g.home_abbr} (Home)</span>
+              <span>{g.away_abbr} (Away)</span>
+            </div>
+          </GlassCard>
+        )}
       </div>
 
-      {/* Key Player Matchups */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Key Player Matchups
-        </h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-          {game.matchups.map((m) => (
-            <div key={m.away} className="rounded-lg bg-background p-4 text-center">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{m.away}</span>
-                <span className="text-xs text-text-muted">vs</span>
-                <span className="text-sm font-medium">{m.home}</span>
+      {/* Key Player Matchups — H2H vs opponent */}
+      {(keyMatchups.home_matchups.length > 0 || keyMatchups.away_matchups.length > 0) && (
+        <GlassCard hover={false} padding="sm">
+          <div className="flex items-center gap-2 px-3 pt-2 mb-3">
+            <Swords className="h-3.5 w-3.5 text-indigo-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Key Player Matchups</h2>
+            <span className="text-[9px] text-text-muted/40 ml-auto">Historical vs opponent this season</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-3 pb-3">
+            {/* Home team matchups */}
+            {keyMatchups.home_matchups.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 pb-1 border-b border-white/[0.04]">
+                  <div className="relative h-4 w-4">
+                    <Image src={getTeamLogoByAbbr(g.home_abbr)} alt={g.home_abbr} fill className="object-contain" unoptimized />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">{g.home_abbr} vs {g.away_abbr}</span>
+                </div>
+                <div className="space-y-2">
+                  {keyMatchups.home_matchups.map((m) => {
+                    const hasMU = m.games > 0;
+                    return (
+                      <div key={m.player_id} className="flex items-center gap-3 py-1.5">
+                        <a href={`/players/${m.player_id}`} className="flex-1 min-w-0 hover:text-indigo-400 transition-colors">
+                          <span className="text-[12px] font-semibold text-text-primary block truncate">{m.player_name}</span>
+                          {m.bis_score && <span className={`text-[10px] font-stat ${tierClass(m.bis_score)}`}>BIS {m.bis_score.toFixed(0)}</span>}
+                        </a>
+                        {hasMU ? (
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="font-stat text-sm font-bold text-text-primary">{m.avg_pts}</span>
+                              <span className="text-[9px] text-text-muted/40 ml-0.5">PTS</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-stat text-[11px] text-text-secondary">{m.avg_reb}</span>
+                              <span className="text-[9px] text-text-muted/40 ml-0.5">REB</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-stat text-[11px] text-text-secondary">{m.avg_ast}</span>
+                              <span className="text-[9px] text-text-muted/40 ml-0.5">AST</span>
+                            </div>
+                            <span className={`text-[10px] font-bold font-stat ${m.pts_diff > 2 ? "text-emerald-400" : m.pts_diff < -2 ? "text-rose-400" : "text-text-muted/50"}`}>
+                              {m.pts_diff > 0 ? "+" : ""}{m.pts_diff}
+                            </span>
+                            <span className="text-[9px] text-text-muted/30 font-stat">{m.games}G</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-text-muted/30 italic">No matchup data</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="mt-2">
-                <span className="font-stat text-lg font-bold text-accent">{m.maiAway}</span>
-                <span className="ml-1 text-xs text-text-muted">MAI</span>
+            )}
+            {/* Away team matchups */}
+            {keyMatchups.away_matchups.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 pb-1 border-b border-white/[0.04]">
+                  <div className="relative h-4 w-4">
+                    <Image src={getTeamLogoByAbbr(g.away_abbr)} alt={g.away_abbr} fill className="object-contain" unoptimized />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">{g.away_abbr} vs {g.home_abbr}</span>
+                </div>
+                <div className="space-y-2">
+                  {keyMatchups.away_matchups.map((m) => {
+                    const hasMU = m.games > 0;
+                    return (
+                      <div key={m.player_id} className="flex items-center gap-3 py-1.5">
+                        <a href={`/players/${m.player_id}`} className="flex-1 min-w-0 hover:text-indigo-400 transition-colors">
+                          <span className="text-[12px] font-semibold text-text-primary block truncate">{m.player_name}</span>
+                          {m.bis_score && <span className={`text-[10px] font-stat ${tierClass(m.bis_score)}`}>BIS {m.bis_score.toFixed(0)}</span>}
+                        </a>
+                        {hasMU ? (
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="font-stat text-sm font-bold text-text-primary">{m.avg_pts}</span>
+                              <span className="text-[9px] text-text-muted/40 ml-0.5">PTS</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-stat text-[11px] text-text-secondary">{m.avg_reb}</span>
+                              <span className="text-[9px] text-text-muted/40 ml-0.5">REB</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-stat text-[11px] text-text-secondary">{m.avg_ast}</span>
+                              <span className="text-[9px] text-text-muted/40 ml-0.5">AST</span>
+                            </div>
+                            <span className={`text-[10px] font-bold font-stat ${m.pts_diff > 2 ? "text-emerald-400" : m.pts_diff < -2 ? "text-rose-400" : "text-text-muted/50"}`}>
+                              {m.pts_diff > 0 ? "+" : ""}{m.pts_diff}
+                            </span>
+                            <span className="text-[9px] text-text-muted/30 font-stat">{m.games}G</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-text-muted/30 italic">No matchup data</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <p className="mt-1 text-xs text-text-secondary">{m.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+            )}
+          </div>
+        </GlassCard>
+      )}
 
-      {/* Projected Stat Lines */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Projected Stat Lines
-        </h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-text-muted">
-                <th className="pb-2 pr-4">Player</th>
-                <th className="pb-2 pr-4">Team</th>
-                <th className="pb-2 pr-4 text-right">MIN</th>
-                <th className="pb-2 pr-4 text-right">PTS</th>
-                <th className="pb-2 pr-4 text-right">REB</th>
-                <th className="pb-2 pr-4 text-right">AST</th>
-                <th className="pb-2 text-right">USG</th>
-              </tr>
-            </thead>
-            <tbody>
-              {game.projectedStats.map((player) => (
-                <tr key={player.name} className="border-b border-border/50">
-                  <td className="py-2.5 pr-4 font-medium">{player.name}</td>
-                  <td className="pr-4 text-text-muted">{player.team}</td>
-                  <td className="pr-4 text-right font-stat">{player.min}</td>
-                  <td className="pr-4 text-right font-stat">{player.pts}</td>
-                  <td className="pr-4 text-right font-stat">{player.reb}</td>
-                  <td className="pr-4 text-right font-stat">{player.ast}</td>
-                  <td className="text-right font-stat text-text-secondary">{player.usg}</td>
+      {/* Full Box Score (final games) */}
+      {isFinal && pLogs.length > 0 && (
+        <GlassCard hover={false} padding="sm">
+          <div className="flex items-center gap-2 mb-2 px-3 pt-2">
+            <Zap className="h-3.5 w-3.5 text-indigo-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Box Score</h2>
+          </div>
+          <div className="space-y-4">
+            <BoxScoreTable players={pLogs} teamAbbr={g.away_abbr} teamId={Number(g.away_team_id)} />
+            <BoxScoreTable players={pLogs} teamAbbr={g.home_abbr} teamId={Number(g.home_team_id)} />
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Player Projections (scheduled games) */}
+      {!isFinal && pProj.length > 0 && (
+        <GlassCard>
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="h-3.5 w-3.5 text-indigo-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Player Projections</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.04]">
+                  <th className="px-3 py-2 text-left text-[9px] uppercase tracking-widest text-text-muted/40">Player</th>
+                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Proj PTS</th>
+                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Range</th>
+                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Proj REB</th>
+                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Proj AST</th>
+                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-indigo-400/40">
+                    <MetricTooltip metricKey="bis">BIS</MetricTooltip>
+                  </th>
+                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Vol</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Model Explanation */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          Model Explanation
-        </h2>
-        <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-          BOS is favored primarily due to home court advantage (+3.8 pts), LAL&apos;s
-          back-to-back fatigue penalty, and BOS&apos;s stronger recent form (LTFI 68 vs 52).
-          However, confidence is moderate — if AD plays, the gap narrows to ~52% BOS.
-          LAL&apos;s paint dominance could disrupt BOS if Porzingis is in foul trouble. The
-          pace projection of 100.2 slightly favors BOS who play better at higher tempo.
-          Key swing factor: Anthony Davis&apos;s availability and foul trouble for Porzingis.
-        </p>
-      </section>
+              </thead>
+              <tbody>
+                {pProj.map((p: any, i: number) => (
+                  <tr key={i} className="border-b border-white/[0.03] table-row-hover">
+                    <td className="px-3 py-2">
+                      <a href={`/players/${p.player_id}`} className="hover:text-indigo-400 transition-colors">
+                        <span className="font-semibold text-text-primary">{p.full_name}</span>
+                        <span className="text-[10px] text-text-muted ml-1.5">{p.team_abbr}</span>
+                      </a>
+                    </td>
+                    <td className="px-3 py-2 text-right font-stat font-bold text-text-primary">{Number(p.proj_pts).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat text-text-muted/50 text-[11px]">
+                      {Number(p.proj_pts_low).toFixed(0)}-{Number(p.proj_pts_high).toFixed(0)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-stat text-text-muted">{Number(p.proj_reb).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat text-text-muted">{Number(p.proj_ast).toFixed(1)}</td>
+                    <td className={`px-3 py-2 text-right font-stat font-bold ${tierClass(p.bis_score ? Number(p.bis_score) : null)}`}>
+                      {p.bis_score ? Number(p.bis_score).toFixed(0) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className={`text-[10px] font-bold uppercase ${
+                        p.proj_volatility === "high" ? "text-amber-400" :
+                        p.proj_volatility === "moderate" ? "text-text-muted/60" :
+                        "text-emerald-400/60"
+                      }`}>{p.proj_volatility}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
     </div>
   );
 }
