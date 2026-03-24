@@ -12,46 +12,38 @@ interface Props {
 export function TeamsTable({ teams }: Props) {
   const columns: Column<any>[] = [
     {
-      key: "rank", label: "#", width: "40px",
-      render: (_row, i) => <span className="font-stat text-text-muted/30">{i + 1}</span>,
+      key: "rank", label: "#", width: "35px",
+      render: (_row, i) => <span className="font-stat text-text-muted/40">{i + 1}</span>,
     },
     {
-      key: "name", label: "Team", sortable: true, width: "220px",
+      key: "name", label: "Team", sortable: true,
       sortValue: (r) => r.nickname,
       render: (r) => (
-        <a href={`/teams/${r.id}`} className="flex items-center gap-3 hover:text-indigo-400 transition-colors">
-          <div className="relative h-10 w-10 shrink-0 transition-transform hover:scale-105">
-            <Image src={getTeamLogoByAbbr(r.abbreviation)} alt={r.nickname} fill className="object-contain drop-shadow-md" unoptimized />
+        <a href={`/teams/${r.id}`} className="flex items-center gap-2 hover:text-indigo-400 transition-colors whitespace-nowrap">
+          <div className="relative h-7 w-7 shrink-0">
+            <Image src={getTeamLogoByAbbr(r.abbreviation)} alt={r.nickname} fill className="object-contain" unoptimized />
           </div>
-          <div>
-            <p className="text-[13px] font-semibold">{r.city} {r.nickname}</p>
-            <p className="text-[10px] text-text-muted/60">{r.division}</p>
-          </div>
+          <span className="text-[13px] font-semibold truncate">{r.nickname}</span>
+          <span className={`shrink-0 rounded-sm border px-1 py-0.5 text-[8px] font-bold ${
+            r.conference === "East"
+              ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+          }`}>{r.conference === "East" ? "E" : "W"}</span>
         </a>
       ),
     },
     {
-      key: "conf", label: "Conf", width: "65px",
-      render: (r) => (
-        <span className={`inline-block rounded-sm border px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ${
-          r.conference === "East"
-            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-        }`}>{r.conference === "East" ? "East" : "West"}</span>
-      ),
-    },
-    {
-      key: "w", label: "W", align: "right", sortable: true, width: "50px",
+      key: "w", label: "W", align: "right", sortable: true, width: "45px",
       sortValue: (r) => num(r.wins),
-      render: (r) => <span className="font-stat font-bold text-emerald-400 tabular-nums text-[13px]">{r.wins ?? 0}</span>,
+      render: (r) => <span className="font-stat font-bold text-emerald-400 tabular-nums">{r.wins ?? 0}</span>,
     },
     {
-      key: "l", label: "L", align: "right", sortable: true, width: "50px",
+      key: "l", label: "L", align: "right", sortable: true, width: "45px",
       sortValue: (r) => num(r.losses),
-      render: (r) => <span className="font-stat font-bold text-rose-400 tabular-nums text-[13px]">{r.losses ?? 0}</span>,
+      render: (r) => <span className="font-stat font-bold text-rose-400 tabular-nums">{r.losses ?? 0}</span>,
     },
     {
-      key: "winpct", label: "Win%", align: "right", sortable: true, width: "70px",
+      key: "winpct", label: "Win%", align: "right", sortable: true, width: "60px",
       sortValue: (r) => {
         const w = num(r.wins) ?? 0, l = num(r.losses) ?? 0;
         return (w + l) > 0 ? w / (w + l) : 0;
