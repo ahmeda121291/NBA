@@ -229,7 +229,35 @@ async function updateSalaries() {
     }
   }
 
-  console.log(`  Matched ${matched} of ${players.length} players with salary data`);
+  console.log(`  Matched ${matched} of ${players.length} players with known salary data`);
+
+  // Fill remaining players with estimated salaries based on BIS/PPG tier
+  console.log("\n  Estimating salaries for remaining players...");
+  const estimated = await sql`
+    WITH ranked AS (
+      SELECT
+        pss.id,
+        COALESCE(pms.bis_score::numeric, pss.ppg::numeric * 2.5) as val,
+        RANK() OVER (ORDER BY COALESCE(pms.bis_score::numeric, pss.ppg::numeric * 2.5) DESC) as rnk
+      FROM player_season_stats pss
+      LEFT JOIN player_metric_snapshots pms ON pms.player_id = pss.player_id
+      WHERE (pss.salary IS NULL OR pss.salary = 0)
+        AND pss.games_played > 5
+    )
+    UPDATE player_season_stats SET salary = CASE
+      WHEN rnk <= 5 THEN 45000000 + (5 - rnk) * 3000000
+      WHEN rnk <= 15 THEN 30000000 + (15 - rnk) * 1500000
+      WHEN rnk <= 40 THEN 18000000 + (40 - rnk) * 480000
+      WHEN rnk <= 80 THEN 8000000 + (80 - rnk) * 250000
+      WHEN rnk <= 150 THEN 3000000 + (150 - rnk) * 71000
+      WHEN rnk <= 300 THEN 1800000 + (300 - rnk) * 8000
+      ELSE 1200000
+    END
+    FROM ranked
+    WHERE player_season_stats.id = ranked.id
+  `;
+  const [estCount] = await sql`SELECT COUNT(*) as c FROM player_season_stats WHERE salary > 0`;
+  console.log(`  ✓ Now ${estCount.c} players have salary data (known + estimated)`);
 
   // Compute VFM (Value For Money) = BIS / (salary in millions)
   console.log("\n  Computing VFM scores...");
@@ -260,10 +288,10 @@ async function updateSalaries() {
   `;
   console.log("  ✓ Team payrolls computed");
 
-  // Print top VFM players
-  console.log("\n  🏆 Top 10 Value For Money:");
+  // Print top VFM players (deduplicated)
+  console.log("\n  🏆 Top 15 Value For Money:");
   const topVFM = await sql`
-    SELECT p.full_name, t.abbreviation,
+    SELECT DISTINCT ON (p.id) p.full_name, t.abbreviation,
            pss.salary, pss.vfm,
            pms.bis_score
     FROM player_season_stats pss
@@ -271,19 +299,20 @@ async function updateSalaries() {
     JOIN teams t ON t.id = pss.team_id
     LEFT JOIN player_metric_snapshots pms ON pms.player_id = pss.player_id
     WHERE pss.vfm IS NOT NULL AND pss.salary > 0
-    ORDER BY pss.vfm DESC
-    LIMIT 10
+    ORDER BY p.id, pss.vfm DESC
   `;
 
-  for (const p of topVFM) {
+  // Sort and print top 15
+  const sortedVfm = topVFM.sort((a: any, b: any) => Number(b.vfm) - Number(a.vfm)).slice(0, 15);
+  for (const p of sortedVfm) {
     const salM = (Number(p.salary) / 1000000).toFixed(1);
     console.log(`    ${String(p.full_name).padEnd(25)} ${String(p.abbreviation).padEnd(4)} BIS: ${Number(p.bis_score || 0).toFixed(0).padStart(3)}  $${salM}M  VFM: ${Number(p.vfm).toFixed(1)}`);
   }
 
-  // Print most overpaid
+  // Print most overpaid (deduplicated)
   console.log("\n  💸 Most Overpaid (lowest VFM with high salary):");
   const overpaid = await sql`
-    SELECT p.full_name, t.abbreviation,
+    SELECT DISTINCT ON (p.id) p.full_name, t.abbreviation,
            pss.salary, pss.vfm,
            pms.bis_score
     FROM player_season_stats pss
@@ -291,11 +320,11 @@ async function updateSalaries() {
     JOIN teams t ON t.id = pss.team_id
     LEFT JOIN player_metric_snapshots pms ON pms.player_id = pss.player_id
     WHERE pss.vfm IS NOT NULL AND pss.salary >= 25000000
-    ORDER BY pss.vfm ASC
-    LIMIT 10
+    ORDER BY p.id, pss.vfm ASC
   `;
 
-  for (const p of overpaid) {
+  const sortedOverpaid = overpaid.sort((a: any, b: any) => Number(a.vfm) - Number(b.vfm)).slice(0, 10);
+  for (const p of sortedOverpaid) {
     const salM = (Number(p.salary) / 1000000).toFixed(1);
     console.log(`    ${String(p.full_name).padEnd(25)} ${String(p.abbreviation).padEnd(4)} BIS: ${Number(p.bis_score || 0).toFixed(0).padStart(3)}  $${salM}M  VFM: ${Number(p.vfm).toFixed(1)}`);
   }

@@ -61,7 +61,8 @@
       "Bash(cmd /c \"npx next dev\")",
       "Bash(npm ls:*)",
       "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
-      "Bash(npx --prefix web tsx scripts/create-auth-tables.ts)"
+      "Bash(npx --prefix web tsx scripts/create-auth-tables.ts)",
+      "Bash(npm init:*)"
     ]
   }
 }
