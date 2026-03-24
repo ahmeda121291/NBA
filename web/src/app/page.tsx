@@ -173,6 +173,7 @@ export default async function DashboardPage() {
                 Leaderboards <ArrowRight className="h-3 w-3" />
               </a>
             </div>
+            <p className="text-[10px] text-text-muted/40 mb-3 -mt-1">Players performing most above their own season average — not overall best, but biggest recent surge</p>
             <GlassCard padding="none" hover={false}>
               {hot.map((p: any, i: number) => {
                 const lfi = p.lfi_score ? Number(p.lfi_score) : null;

@@ -82,6 +82,7 @@ export default async function LeaderboardsPage() {
               <Flame className="h-3.5 w-3.5 text-emerald-400" />
               <h3 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Hottest — Live Form Index</h3>
             </div>
+            <p className="text-[9px] text-text-muted/40 px-3 pb-1">Biggest surge vs own season average, not overall best</p>
             <div className="divide-y divide-white/[0.03]">
               {lfiPlayers.map((p: any, i: number) => {
                 const lfi = p.lfi_score ? Number(p.lfi_score) : null;

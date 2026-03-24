@@ -290,7 +290,7 @@ export function DataTable<T>({
                     className={`px-3 py-2.5 text-[9px] uppercase tracking-widest font-semibold ${
                       col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
                     } text-text-muted/40 transition-colors`}
-                    style={{ width: col.width }}
+                    style={{ width: col.width, minWidth: col.width }}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
                     <span className={`flex items-center gap-1 ${
@@ -324,6 +324,7 @@ export function DataTable<T>({
                         col.align === "right" ? "text-right" :
                         col.align === "center" ? "text-center" : "text-left"
                       }`}
+                      style={col.width ? { width: col.width, minWidth: col.width } : undefined}
                     >
                       {col.render(row, i)}
                     </td>

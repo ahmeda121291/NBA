@@ -31,9 +31,9 @@ export function TeamsTable({ teams }: Props) {
       ),
     },
     {
-      key: "conf", label: "Conf", width: "65px",
+      key: "conf", label: "Conf", width: "80px",
       render: (r) => (
-        <span className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold ${
+        <span className={`inline-block rounded-sm border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${
           r.conference === "East"
             ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
             : "bg-amber-500/10 text-amber-400 border-amber-500/20"
@@ -41,14 +41,14 @@ export function TeamsTable({ teams }: Props) {
       ),
     },
     {
-      key: "w", label: "W", align: "center", sortable: true, width: "50px",
+      key: "w", label: "W", align: "center", sortable: true, width: "55px",
       sortValue: (r) => num(r.wins),
-      render: (r) => <span className="font-stat font-bold text-emerald-400">{r.wins ?? 0}</span>,
+      render: (r) => <span className="font-stat font-bold text-emerald-400 tabular-nums">{r.wins ?? 0}</span>,
     },
     {
-      key: "l", label: "L", align: "center", sortable: true, width: "50px",
+      key: "l", label: "L", align: "center", sortable: true, width: "55px",
       sortValue: (r) => num(r.losses),
-      render: (r) => <span className="font-stat font-bold text-rose-400">{r.losses ?? 0}</span>,
+      render: (r) => <span className="font-stat font-bold text-rose-400 tabular-nums">{r.losses ?? 0}</span>,
     },
     {
       key: "winpct", label: "Win%", align: "right", sortable: true,
