@@ -357,7 +357,9 @@ async function main() {
       drs: Math.round(drs * 100) / 100,
       drsConfidence: Math.round(drsConfidence * 100) / 100,
       drsLabel,
-      drsComponents: { stl: spgNorm, blk: bpgNorm, dreb: drebNorm, posAdj },
+      drsComponents: hasDefData
+        ? { defRtg: defRating, contested: contestedShots, deflections, defWs, hustle: looseBalls, stl: spgNorm, blk: bpgNorm }
+        : { stl: spgNorm, blk: bpgNorm, boxScoreOnly: true },
       lfi: Math.round(lfi * 100) / 100,
       lfiConfidence: Math.round(lfiConfidence * 100) / 100,
       lfiStreakLabel,
