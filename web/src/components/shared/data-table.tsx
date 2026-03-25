@@ -281,12 +281,7 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} className="text-sm">
-            <colgroup>
-              {visibleColumns.map((col) => (
-                <col key={col.key} style={{ width: col.width || "auto" }} />
-              ))}
-            </colgroup>
+          <table style={{ width: "100%", borderCollapse: "collapse" }} className="text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {visibleColumns.map((col) => {
@@ -294,6 +289,7 @@ export function DataTable<T>({
                   return (
                     <th
                       key={col.key}
+                      style={col.width ? { width: col.width, minWidth: col.key === "name" ? "120px" : col.width } : undefined}
                       className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 transition-colors ${
                         col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
                       }`}
@@ -324,6 +320,7 @@ export function DataTable<T>({
                   {visibleColumns.map((col) => (
                     <td
                       key={col.key}
+                      style={col.width ? { width: col.width, minWidth: col.key === "name" ? "120px" : col.width } : undefined}
                       className={`px-3 py-2.5 ${
                         col.align === "right" ? "text-right" :
                         col.align === "center" ? "text-center" : "text-left"
