@@ -163,11 +163,17 @@ export function DataTable<T>({
     return [...filteredData].sort((a, b) => {
       const va = col.sortValue!(a);
       const vb = col.sortValue!(b);
-      if (va == null && vb == null) return 0;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      const cmp = typeof va === "number" && typeof vb === "number"
-        ? va - vb
+      // Nulls/NaN always go to bottom regardless of sort direction
+      const aNull = va == null || (typeof va === "number" && isNaN(va));
+      const bNull = vb == null || (typeof vb === "number" && isNaN(vb));
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      // Force numeric comparison if both values look numeric
+      const aNum = typeof va === "number" ? va : parseFloat(String(va));
+      const bNum = typeof vb === "number" ? vb : parseFloat(String(vb));
+      const cmp = (!isNaN(aNum) && !isNaN(bNum))
+        ? aNum - bNum
         : String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });

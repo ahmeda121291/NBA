@@ -16,7 +16,7 @@ export function TeamsTable({ teams }: Props) {
       render: (_row, i) => <span className="font-stat text-text-muted/50 text-[13px]">{i + 1}</span>,
     },
     {
-      key: "name", label: "Team", sortable: true, width: "220px",
+      key: "name", label: "Team", sortable: true, width: "200px",
       sortValue: (r) => r.nickname,
       render: (r) => (
         <a href={`/teams/${r.id}`} className="flex items-center gap-2.5 hover:text-indigo-400 transition-colors">
@@ -31,10 +31,10 @@ export function TeamsTable({ teams }: Props) {
       ),
     },
     {
-      key: "conf", label: "Conf", align: "center", sortable: true, width: "60px",
+      key: "conf", label: "Conf", align: "center", sortable: true, width: "70px",
       sortValue: (r) => r.conference,
       render: (r) => (
-        <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] font-bold ${
+        <span className={`rounded-sm border px-1 py-0.5 text-[9px] font-bold inline-block text-center ${
           r.conference === "East"
             ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
             : "bg-amber-500/10 text-amber-400 border-amber-500/20"
