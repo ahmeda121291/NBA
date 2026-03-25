@@ -383,7 +383,7 @@ export async function getPlayerWithMetrics(id: number) {
 /** Get all teams with CourtVision metrics */
 export async function getAllTeamsWithMetrics() {
   const rows = await db.execute(sql`
-    SELECT
+    SELECT DISTINCT ON (t.id)
       t.id, t.external_id, t.abbreviation, t.name, t.city, t.nickname,
       t.conference, t.division, t.primary_color, t.arena,
       tss.wins, tss.losses, tss.fg_pct, tss.fg3_pct, tss.ft_pct,
@@ -396,9 +396,13 @@ export async function getAllTeamsWithMetrics() {
     FROM teams t
     LEFT JOIN team_season_stats tss ON t.id = tss.team_id
     LEFT JOIN team_metric_snapshots tms ON tms.team_id = t.id
-    ORDER BY tms.tsc_score DESC NULLS LAST, tss.wins DESC NULLS LAST
+    ORDER BY t.id
   `);
-  return rows;
+  return [...rows].sort((a: any, b: any) => {
+    const aScore = Number(a.tsc_score) || 0;
+    const bScore = Number(b.tsc_score) || 0;
+    return bScore - aScore;
+  });
 }
 
 /** Get team with metrics by ID */
@@ -739,7 +743,7 @@ export async function getBiggestMovers(limit = 10) {
 /** Get all players with full stats + metrics (for DataTable) */
 export async function getAllPlayersWithFullStats(limit = 200) {
   const rows = await db.execute(sql`
-    SELECT
+    SELECT DISTINCT ON (p.id)
       p.id, p.external_id, p.full_name, p.position,
       t.abbreviation AS team_abbr,
       pss.games_played, pss.games_started,
@@ -758,16 +762,21 @@ export async function getAllPlayersWithFullStats(limit = 200) {
     JOIN teams t ON pss.team_id = t.id
     LEFT JOIN player_metric_snapshots pms ON pms.player_id = p.id
     WHERE pss.ppg IS NOT NULL AND pss.games_played > 10
-    ORDER BY pms.bis_score DESC NULLS LAST, pss.ppg DESC
-    LIMIT ${limit}
+    ORDER BY p.id, pms.bis_score DESC NULLS LAST
   `);
-  return rows;
+  // Re-sort by BIS after DISTINCT ON
+  const sorted = [...rows].sort((a: any, b: any) => {
+    const aScore = Number(a.bis_score) || Number(a.ppg) || 0;
+    const bScore = Number(b.bis_score) || Number(b.ppg) || 0;
+    return bScore - aScore;
+  });
+  return sorted.slice(0, limit);
 }
 
 /** Get all teams with full stats + metrics (for DataTable) */
 export async function getAllTeamsWithFullStats() {
   const rows = await db.execute(sql`
-    SELECT
+    SELECT DISTINCT ON (t.id)
       t.id, t.external_id, t.abbreviation, t.name, t.city, t.nickname,
       t.conference, t.division, t.primary_color, t.arena,
       tss.wins, tss.losses, tss.fg_pct, tss.fg3_pct, tss.ft_pct,
@@ -782,9 +791,14 @@ export async function getAllTeamsWithFullStats() {
     FROM teams t
     LEFT JOIN team_season_stats tss ON t.id = tss.team_id
     LEFT JOIN team_metric_snapshots tms ON tms.team_id = t.id
-    ORDER BY tms.tsc_score DESC NULLS LAST, tss.wins DESC NULLS LAST
+    ORDER BY t.id
   `);
-  return rows;
+  // Re-sort by TSC after DISTINCT ON
+  return [...rows].sort((a: any, b: any) => {
+    const aScore = Number(a.tsc_score) || 0;
+    const bScore = Number(b.tsc_score) || 0;
+    return bScore - aScore;
+  });
 }
 
 /** Recent games with team metrics for dashboard */
