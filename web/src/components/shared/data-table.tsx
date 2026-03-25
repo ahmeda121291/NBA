@@ -287,26 +287,23 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed", width: "100%", minWidth: `${visibleColumns.reduce((sum, col) => sum + (col.width ? parseInt(col.width) : 80), 0)}px` }}>
-            <colgroup>
-              {visibleColumns.map((col) => (
-                <col key={col.key} style={{ width: col.width || "80px" }} />
-              ))}
-            </colgroup>
+          <table className="text-sm" style={{ borderCollapse: "collapse", minWidth: "100%" }}>
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {visibleColumns.map((col) => {
-                  const justifyClass = col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start";
+                  const isNameCol = col.key === "name";
+                  const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
+                  const justifyCls = col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start";
                   return (
                     <th
                       key={col.key}
-                      style={col.width ? { width: col.width, minWidth: col.key === "name" ? "120px" : col.width } : undefined}
-                      className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 transition-colors ${
+                      style={isNameCol ? undefined : col.width ? { width: col.width } : { width: "70px" }}
+                      className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 whitespace-nowrap transition-colors ${alignCls} ${
                         col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
                       }`}
                       onClick={() => col.sortable && handleSort(col.key)}
                     >
-                      <div className={`flex items-center gap-1 whitespace-nowrap ${justifyClass}`}>
+                      <div className={`flex items-center gap-1 ${justifyCls}`}>
                         {col.isMetric && col.metricKey ? (
                           <MetricTooltip metricKey={col.metricKey}>
                             <span className="text-indigo-400/80">{col.label}</span>
@@ -328,20 +325,19 @@ export function DataTable<T>({
             <tbody>
               {sortedData.map((row, i) => (
                 <tr key={i} className="border-b border-white/[0.03] table-row-hover">
-                  {visibleColumns.map((col) => (
+                  {visibleColumns.map((col) => {
+                    const isNameCol = col.key === "name";
+                    const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
+                    return (
                     <td
                       key={col.key}
-                      style={col.width ? { width: col.width, minWidth: col.key === "name" ? "120px" : col.width } : undefined}
-                      className={`px-3 py-2.5 ${
-                        col.align === "right" ? "text-right" :
-                        col.align === "center" ? "text-center" : "text-left"
-                      }`}
+                      style={isNameCol ? undefined : col.width ? { width: col.width } : { width: "70px" }}
+                      className={`px-3 py-2.5 whitespace-nowrap ${alignCls}`}
                     >
-                      <div className={col.key === "name" ? "truncate" : "whitespace-nowrap"}>
                         {col.render(row, i)}
-                      </div>
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
               ))}
               {sortedData.length === 0 && (

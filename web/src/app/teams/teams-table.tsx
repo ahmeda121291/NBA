@@ -16,7 +16,7 @@ export function TeamsTable({ teams }: Props) {
       render: (_row, i) => <span className="font-stat text-text-muted/50 text-[13px]">{i + 1}</span>,
     },
     {
-      key: "name", label: "Team", sortable: true, width: "200px",
+      key: "name", label: "Team", sortable: true,
       sortValue: (r) => r.nickname,
       render: (r) => (
         <a href={`/teams/${r.id}`} className="flex items-center gap-2.5 hover:text-indigo-400 transition-colors">
