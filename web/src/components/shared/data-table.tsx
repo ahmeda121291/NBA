@@ -281,25 +281,29 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed" style={{ minWidth: "700px" }}>
+          <table className="text-sm border-collapse" style={{ width: "100%", tableLayout: "auto" }}>
+            <colgroup>
+              {visibleColumns.map((col) => (
+                <col key={col.key} style={col.width ? { width: col.width } : undefined} />
+              ))}
+            </colgroup>
             <thead>
-              <tr className="border-b border-white/[0.04]">
+              <tr className="border-b border-white/[0.06]">
                 {visibleColumns.map((col) => (
                   <th
                     key={col.key}
-                    className={`px-3 py-2.5 text-[10px] uppercase tracking-widest font-semibold ${
+                    className={`px-2 py-2.5 text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap ${
                       col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
-                    } text-text-muted/60 transition-colors`}
-                    style={col.width ? { width: col.width, minWidth: col.width, maxWidth: col.width } : undefined}
+                    } text-text-muted/70 transition-colors ${
+                      col.align === "right" ? "text-right" :
+                      col.align === "center" ? "text-center" : "text-left"
+                    }`}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
-                    <span className={`flex items-center gap-1 ${
-                      col.align === "right" ? "justify-end" :
-                      col.align === "center" ? "justify-center" : "justify-start"
-                    }`}>
+                    <span className={`inline-flex items-center gap-1`}>
                       {col.isMetric && col.metricKey ? (
                         <MetricTooltip metricKey={col.metricKey}>
-                          <span className="text-indigo-400/70">{col.label}</span>
+                          <span className="text-indigo-400/80">{col.label}</span>
                         </MetricTooltip>
                       ) : (
                         col.label
@@ -320,11 +324,10 @@ export function DataTable<T>({
                   {visibleColumns.map((col) => (
                     <td
                       key={col.key}
-                      className={`px-3 py-2 ${
+                      className={`px-2 py-2.5 whitespace-nowrap ${
                         col.align === "right" ? "text-right" :
                         col.align === "center" ? "text-center" : "text-left"
                       }`}
-                      style={col.width ? { width: col.width, minWidth: col.width } : undefined}
                     >
                       {col.render(row, i)}
                     </td>
