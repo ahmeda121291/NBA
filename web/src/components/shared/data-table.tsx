@@ -287,7 +287,12 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table style={{ width: "100%", borderCollapse: "collapse" }} className="text-sm">
+          <table className="text-sm" style={{ borderCollapse: "collapse", tableLayout: "fixed", width: "100%", minWidth: `${visibleColumns.reduce((sum, col) => sum + (col.width ? parseInt(col.width) : 80), 0)}px` }}>
+            <colgroup>
+              {visibleColumns.map((col) => (
+                <col key={col.key} style={{ width: col.width || "80px" }} />
+              ))}
+            </colgroup>
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {visibleColumns.map((col) => {
