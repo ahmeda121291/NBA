@@ -226,16 +226,60 @@ async function main() {
     const rdaLabel = tierLabel(rda);
 
     // ---- DRS (Defensive Reality Score) ----
-    const drebFactor = isBig ? 0.7 : 0.3;
-    const estimatedDreb = rpg * drebFactor;
-    const drebNorm = normalize(estimatedDreb, leagueAvg.rpg * drebFactor, leagueStd.rpg * drebFactor);
-    // Positional adjustment: bigs get bonus for blocks, guards for steals
-    const posAdj = isBig
-      ? bpgNorm * 0.15 + spgNorm * 0.05
-      : spgNorm * 0.15 + bpgNorm * 0.05;
-    const drs = clamp(spgNorm * 0.25 + bpgNorm * 0.25 + drebNorm * 0.30 + posAdj);
-    const drsConfidence = bisConfidence;
-    const drsLabel = tierLabel(drs);
+    // Uses real defensive data: DEF_RATING, contested shots, deflections, charges, hustle stats
+    const defRating = parseFloat(ps.def_rating || "0");
+    const defWs = parseFloat(ps.def_ws || "0");
+    const contestedShots = parseFloat(ps.contested_shots || "0");
+    const deflections = parseFloat(ps.deflections || "0");
+    const chargesDrawn = parseFloat(ps.charges_drawn || "0");
+    const looseBalls = parseFloat(ps.loose_balls || "0");
+    const boxOuts = parseFloat(ps.box_outs || "0");
+    const oppPtsPaint = parseFloat(ps.opp_pts_paint || "0");
+
+    const hasDefData = defRating > 0 || contestedShots > 0;
+
+    let drs: number;
+    if (hasDefData) {
+      // Real defensive data available — use advanced metrics
+      // DEF_RATING: lower is better (league avg ~112), invert and normalize
+      const defRtgNorm = defRating > 0 ? clamp(50 + (112 - defRating) * 3, 0, 100) : 50;
+      // DEF_WS: higher is better (league avg ~0.04/game), normalize
+      const defWsNorm = defWs > 0 ? clamp(normalize(defWs * gp, 1.5, 1.2), 0, 100) : 50;
+      // Contested shots: higher is better (league avg ~5 for starters)
+      const contestNorm = normalize(contestedShots, 4.5, 2.5);
+      // Deflections: higher is better (league avg ~2)
+      const deflNorm = normalize(deflections, 2.0, 1.5);
+      // Charges: higher is better (league avg ~0.2)
+      const chargeNorm = chargesDrawn > 0 ? clamp(50 + chargesDrawn * 30, 0, 100) : 50;
+      // Loose balls: hustle (league avg ~0.5)
+      const hustleNorm = normalize(looseBalls + boxOuts * 0.3, 1.0, 0.8);
+
+      // Weighted: DEF_RATING is king (35%), then contested shots (20%), deflections (15%),
+      // DEF_WS (10%), hustle (10%), traditional STL/BLK (10%)
+      drs = clamp(
+        defRtgNorm * 0.35 +
+        contestNorm * 0.20 +
+        deflNorm * 0.15 +
+        defWsNorm * 0.10 +
+        hustleNorm * 0.10 +
+        (spgNorm * 0.5 + bpgNorm * 0.5) * 0.10,
+        0, 100
+      );
+    } else {
+      // Fallback: box score only (less reliable, cap at 70 max)
+      const drebFactor = isBig ? 0.7 : 0.3;
+      const estimatedDreb = rpg * drebFactor;
+      const drebNorm = normalize(estimatedDreb, leagueAvg.rpg * drebFactor, leagueStd.rpg * drebFactor);
+      const posAdj = isBig
+        ? bpgNorm * 0.15 + spgNorm * 0.05
+        : spgNorm * 0.15 + bpgNorm * 0.05;
+      drs = clamp((spgNorm * 0.25 + bpgNorm * 0.25 + drebNorm * 0.30 + posAdj) * 0.7, 0, 70);
+    }
+
+    const drsConfidence = hasDefData ? bisConfidence : bisConfidence * 0.5;
+    const drsLabel = hasDefData
+      ? (drs >= 80 ? "Elite Defender" : drs >= 65 ? "Plus Defender" : drs >= 50 ? "Solid Defender" : drs >= 35 ? "Average Defender" : "Weak Defender")
+      : (drs >= 60 ? "Good (box score est.)" : drs >= 40 ? "Average (box score est.)" : "Below Avg (box score est.)");
 
     // ---- LFI (Live Form Index) ----
     const logs = logsByPlayer[playerId] || [];

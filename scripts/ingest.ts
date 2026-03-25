@@ -452,6 +452,102 @@ async function ingestGameTeamStats(seasonId: number): Promise<void> {
 // ============================================================
 // 6. Ingest advanced player stats (PER, USG%, BPM, VORP, WS)
 // ============================================================
+async function ingestDefensiveAndHustleStats(seasonId: number): Promise<void> {
+  step("5.7/9  Ingesting defensive + hustle stats");
+
+  // Ensure columns exist
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS def_rating DECIMAL(6,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS def_ws DECIMAL(6,4);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS contested_shots DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS contested_shots_2pt DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS contested_shots_3pt DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS deflections DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS charges_drawn DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS loose_balls DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS box_outs DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_pts_paint DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_pts_fb DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_pts_2nd DECIMAL(5,2);
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+  `.catch(() => {});
+
+  const playerRows = await sql`SELECT id, external_id FROM players`;
+  const playerMap = new Map(playerRows.map((r) => [r.external_id, r.id]));
+
+  // 1. Hustle stats
+  await sleep(DELAY_MS);
+  try {
+    const url = `https://stats.nba.com/stats/leaguehustlestatsplayer?Season=${SEASON}&SeasonType=Regular+Season&PerMode=PerGame&LeagueID=00`;
+    const data = await nbaFetch(url);
+    const headers: string[] = data.resultSets[0].headers;
+    const rowData: any[][] = data.resultSets[0].rowSet;
+    const rows = rowData.map((r) => {
+      const obj: any = {};
+      headers.forEach((h, i) => (obj[h] = r[i]));
+      return obj;
+    });
+    console.log(`  Got hustle stats for ${rows.length} players`);
+
+    let updated = 0;
+    for (const row of rows) {
+      const pid = playerMap.get(String(row.PLAYER_ID));
+      if (!pid) continue;
+      await sql`
+        UPDATE player_season_stats SET
+          contested_shots = ${row.CONTESTED_SHOTS || 0},
+          contested_shots_2pt = ${row.CONTESTED_SHOTS_2PT || 0},
+          contested_shots_3pt = ${row.CONTESTED_SHOTS_3PT || 0},
+          deflections = ${row.DEFLECTIONS || 0},
+          charges_drawn = ${row.CHARGES_DRAWN || 0},
+          loose_balls = ${row.LOOSE_BALLS_RECOVERED || 0},
+          box_outs = ${row.DEF_BOXOUTS || 0}
+        WHERE player_id = ${pid} AND season_id = ${seasonId}
+      `;
+      updated++;
+    }
+    console.log(`  Updated hustle stats for ${updated} players`);
+  } catch (e: any) {
+    console.log(`  Hustle stats failed: ${e.message}`);
+  }
+
+  // 2. Defensive stats (DEF_RATING, DEF_WS, opponent points)
+  await sleep(DELAY_MS);
+  try {
+    const url = `https://stats.nba.com/stats/leaguedashplayerstats?Season=${SEASON}&SeasonType=Regular+Season&PerMode=PerGame&MeasureType=Defense&LeagueID=00&LastNGames=0&Month=0&OpponentTeamID=0&PORound=0&PaceAdjust=N&Period=0&PlusMinus=N&Rank=N`;
+    const data = await nbaFetch(url);
+    const headers: string[] = data.resultSets[0].headers;
+    const rowData: any[][] = data.resultSets[0].rowSet;
+    const rows = rowData.map((r) => {
+      const obj: any = {};
+      headers.forEach((h, i) => (obj[h] = r[i]));
+      return obj;
+    });
+    console.log(`  Got defensive stats for ${rows.length} players`);
+
+    let updated = 0;
+    for (const row of rows) {
+      const pid = playerMap.get(String(row.PLAYER_ID));
+      if (!pid) continue;
+      await sql`
+        UPDATE player_season_stats SET
+          def_rating = ${row.DEF_RATING || null},
+          def_ws = ${row.DEF_WS || null},
+          opp_pts_paint = ${row.OPP_PTS_PAINT || null},
+          opp_pts_fb = ${row.OPP_PTS_FB || null},
+          opp_pts_2nd = ${row.OPP_PTS_2ND_CHANCE || null}
+        WHERE player_id = ${pid} AND season_id = ${seasonId}
+      `;
+      updated++;
+    }
+    console.log(`  Updated defensive stats for ${updated} players`);
+  } catch (e: any) {
+    console.log(`  Defensive stats failed: ${e.message}`);
+  }
+}
+
 async function ingestAdvancedPlayerStats(seasonId: number): Promise<void> {
   step("6/9  Ingesting advanced player stats");
   await sleep(DELAY_MS);
@@ -859,6 +955,7 @@ async function main() {
     await ingestTeamStats(seasonId);
     await ingestGames(seasonId);
     await ingestGameTeamStats(seasonId);
+    await ingestDefensiveAndHustleStats(seasonId);
     await ingestAdvancedPlayerStats(seasonId);
     await ingestAdvancedTeamStats(seasonId);
     await ingestPlayerGameLogs(seasonId);
