@@ -281,41 +281,38 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} className="text-sm">
+            <colgroup>
+              {visibleColumns.map((col) => (
+                <col key={col.key} style={{ width: col.width || "auto" }} />
+              ))}
+            </colgroup>
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {visibleColumns.map((col) => {
-                  const align = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
+                  const justifyClass = col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start";
                   return (
                     <th
                       key={col.key}
-                      style={col.width ? { width: col.width, minWidth: col.width } : undefined}
-                      className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap ${
+                      className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 transition-colors ${
                         col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
-                      } text-text-muted/70 transition-colors ${align}`}
+                      }`}
                       onClick={() => col.sortable && handleSort(col.key)}
                     >
-                      {col.isMetric && col.metricKey ? (
-                        <MetricTooltip metricKey={col.metricKey}>
-                          <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end" : ""}`}>
+                      <div className={`flex items-center gap-1 whitespace-nowrap ${justifyClass}`}>
+                        {col.isMetric && col.metricKey ? (
+                          <MetricTooltip metricKey={col.metricKey}>
                             <span className="text-indigo-400/80">{col.label}</span>
-                            {col.sortable && sortKey === col.key && (
-                              sortDir === "desc"
-                                ? <ChevronDown className="h-3 w-3 text-indigo-400" />
-                                : <ChevronUp className="h-3 w-3 text-indigo-400" />
-                            )}
-                          </span>
-                        </MetricTooltip>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end w-full" : ""}`}>
-                          {col.label}
-                          {col.sortable && sortKey === col.key && (
-                            sortDir === "desc"
-                              ? <ChevronDown className="h-3 w-3 text-indigo-400" />
-                              : <ChevronUp className="h-3 w-3 text-indigo-400" />
-                          )}
-                        </span>
-                      )}
+                          </MetricTooltip>
+                        ) : (
+                          <span>{col.label}</span>
+                        )}
+                        {col.sortable && sortKey === col.key && (
+                          sortDir === "desc"
+                            ? <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" />
+                            : <ChevronUp className="h-3 w-3 text-indigo-400 shrink-0" />
+                        )}
+                      </div>
                     </th>
                   );
                 })}
@@ -327,13 +324,14 @@ export function DataTable<T>({
                   {visibleColumns.map((col) => (
                     <td
                       key={col.key}
-                      style={col.width ? { width: col.width, minWidth: col.width } : undefined}
-                      className={`px-3 py-2.5 whitespace-nowrap ${
+                      className={`px-3 py-2.5 ${
                         col.align === "right" ? "text-right" :
                         col.align === "center" ? "text-center" : "text-left"
                       }`}
                     >
-                      {col.render(row, i)}
+                      <div className={col.key === "name" ? "truncate" : "whitespace-nowrap"}>
+                        {col.render(row, i)}
+                      </div>
                     </td>
                   ))}
                 </tr>
