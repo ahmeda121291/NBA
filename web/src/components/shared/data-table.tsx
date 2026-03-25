@@ -281,41 +281,44 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="text-sm border-collapse" style={{ width: "100%", tableLayout: "auto" }}>
-            <colgroup>
-              {visibleColumns.map((col) => (
-                <col key={col.key} style={col.width ? { width: col.width } : undefined} />
-              ))}
-            </colgroup>
+          <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-white/[0.06]">
-                {visibleColumns.map((col) => (
-                  <th
-                    key={col.key}
-                    className={`px-2 py-2.5 text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap ${
-                      col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
-                    } text-text-muted/70 transition-colors ${
-                      col.align === "right" ? "text-right" :
-                      col.align === "center" ? "text-center" : "text-left"
-                    }`}
-                    onClick={() => col.sortable && handleSort(col.key)}
-                  >
-                    <span className={`inline-flex items-center gap-1`}>
+                {visibleColumns.map((col) => {
+                  const align = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
+                  return (
+                    <th
+                      key={col.key}
+                      style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                      className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap ${
+                        col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
+                      } text-text-muted/70 transition-colors ${align}`}
+                      onClick={() => col.sortable && handleSort(col.key)}
+                    >
                       {col.isMetric && col.metricKey ? (
                         <MetricTooltip metricKey={col.metricKey}>
-                          <span className="text-indigo-400/80">{col.label}</span>
+                          <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end" : ""}`}>
+                            <span className="text-indigo-400/80">{col.label}</span>
+                            {col.sortable && sortKey === col.key && (
+                              sortDir === "desc"
+                                ? <ChevronDown className="h-3 w-3 text-indigo-400" />
+                                : <ChevronUp className="h-3 w-3 text-indigo-400" />
+                            )}
+                          </span>
                         </MetricTooltip>
                       ) : (
-                        col.label
+                        <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end w-full" : ""}`}>
+                          {col.label}
+                          {col.sortable && sortKey === col.key && (
+                            sortDir === "desc"
+                              ? <ChevronDown className="h-3 w-3 text-indigo-400" />
+                              : <ChevronUp className="h-3 w-3 text-indigo-400" />
+                          )}
+                        </span>
                       )}
-                      {col.sortable && sortKey === col.key && (
-                        sortDir === "desc"
-                          ? <ChevronDown className="h-3 w-3 text-indigo-400" />
-                          : <ChevronUp className="h-3 w-3 text-indigo-400" />
-                      )}
-                    </span>
-                  </th>
-                ))}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -324,7 +327,8 @@ export function DataTable<T>({
                   {visibleColumns.map((col) => (
                     <td
                       key={col.key}
-                      className={`px-2 py-2.5 whitespace-nowrap ${
+                      style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                      className={`px-3 py-2.5 whitespace-nowrap ${
                         col.align === "right" ? "text-right" :
                         col.align === "center" ? "text-center" : "text-left"
                       }`}

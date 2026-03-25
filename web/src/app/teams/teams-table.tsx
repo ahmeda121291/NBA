@@ -12,23 +12,26 @@ interface Props {
 export function TeamsTable({ teams }: Props) {
   const columns: Column<any>[] = [
     {
-      key: "rank", label: "#", width: "35px",
-      render: (_row, i) => <span className="font-stat text-text-muted/40">{i + 1}</span>,
+      key: "rank", label: "#", width: "40px",
+      render: (_row, i) => <span className="font-stat text-text-muted/50 text-[13px]">{i + 1}</span>,
     },
     {
-      key: "name", label: "Team", sortable: true, width: "180px",
+      key: "name", label: "Team", sortable: true, width: "220px",
       sortValue: (r) => r.nickname,
       render: (r) => (
-        <a href={`/teams/${r.id}`} className="flex items-center gap-2 hover:text-indigo-400 transition-colors">
-          <div className="relative h-6 w-6 shrink-0">
+        <a href={`/teams/${r.id}`} className="flex items-center gap-2.5 hover:text-indigo-400 transition-colors">
+          <div className="relative h-7 w-7 shrink-0">
             <Image src={getTeamLogoByAbbr(r.abbreviation)} alt={r.nickname} fill className="object-contain" unoptimized />
           </div>
-          <span className="text-[12px] font-semibold truncate">{r.city} {r.nickname}</span>
+          <div className="min-w-0">
+            <span className="text-[13px] font-semibold text-text-primary block truncate">{r.city} {r.nickname}</span>
+            <span className="text-[10px] text-text-muted/50">{r.division}</span>
+          </div>
         </a>
       ),
     },
     {
-      key: "conf", label: "Conf", align: "center", sortable: true, width: "55px",
+      key: "conf", label: "Conf", align: "center", sortable: true, width: "60px",
       sortValue: (r) => r.conference,
       render: (r) => (
         <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] font-bold ${
@@ -39,12 +42,12 @@ export function TeamsTable({ teams }: Props) {
       ),
     },
     {
-      key: "w", label: "W", align: "right", sortable: true, width: "45px",
+      key: "w", label: "W", align: "right", sortable: true, width: "50px",
       sortValue: (r) => num(r.wins),
       render: (r) => <span className="font-stat font-bold text-emerald-400 tabular-nums">{r.wins ?? 0}</span>,
     },
     {
-      key: "l", label: "L", align: "right", sortable: true, width: "45px",
+      key: "l", label: "L", align: "right", sortable: true, width: "50px",
       sortValue: (r) => num(r.losses),
       render: (r) => <span className="font-stat font-bold text-rose-400 tabular-nums">{r.losses ?? 0}</span>,
     },
