@@ -63,7 +63,8 @@
       "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
       "Bash(npx --prefix web tsx scripts/create-auth-tables.ts)",
       "Bash(npm init:*)",
-      "Bash(npx tsx -e \":*)"
+      "Bash(npx tsx -e \":*)",
+      "Bash(curl -s \"https://nba-production-59c0.up.railway.app/teams\")"
     ]
   }
 }

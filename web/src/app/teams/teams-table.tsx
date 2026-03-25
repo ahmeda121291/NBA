@@ -16,20 +16,26 @@ export function TeamsTable({ teams }: Props) {
       render: (_row, i) => <span className="font-stat text-text-muted/40">{i + 1}</span>,
     },
     {
-      key: "name", label: "Team", sortable: true,
+      key: "name", label: "Team", sortable: true, width: "180px",
       sortValue: (r) => r.nickname,
       render: (r) => (
-        <a href={`/teams/${r.id}`} className="flex items-center gap-2 hover:text-indigo-400 transition-colors whitespace-nowrap">
-          <div className="relative h-7 w-7 shrink-0">
+        <a href={`/teams/${r.id}`} className="flex items-center gap-2 hover:text-indigo-400 transition-colors">
+          <div className="relative h-6 w-6 shrink-0">
             <Image src={getTeamLogoByAbbr(r.abbreviation)} alt={r.nickname} fill className="object-contain" unoptimized />
           </div>
-          <span className="text-[13px] font-semibold truncate">{r.nickname}</span>
-          <span className={`shrink-0 rounded-sm border px-1 py-0.5 text-[8px] font-bold ${
-            r.conference === "East"
-              ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-          }`}>{r.conference === "East" ? "E" : "W"}</span>
+          <span className="text-[12px] font-semibold truncate">{r.city} {r.nickname}</span>
         </a>
+      ),
+    },
+    {
+      key: "conf", label: "Conf", align: "center", sortable: true, width: "55px",
+      sortValue: (r) => r.conference,
+      render: (r) => (
+        <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] font-bold ${
+          r.conference === "East"
+            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+        }`}>{r.conference === "East" ? "East" : "West"}</span>
       ),
     },
     {

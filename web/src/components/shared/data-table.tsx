@@ -281,7 +281,7 @@ export function DataTable<T>({
       {/* Table */}
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: "700px" }}>
+          <table className="w-full text-sm table-fixed" style={{ minWidth: "700px" }}>
             <thead>
               <tr className="border-b border-white/[0.04]">
                 {visibleColumns.map((col) => (
@@ -290,6 +290,7 @@ export function DataTable<T>({
                     className={`px-3 py-2.5 text-[10px] uppercase tracking-widest font-semibold ${
                       col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
                     } text-text-muted/60 transition-colors`}
+                    style={col.width ? { width: col.width, minWidth: col.width, maxWidth: col.width } : undefined}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
                     <span className={`flex items-center gap-1 ${
