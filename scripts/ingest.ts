@@ -697,73 +697,91 @@ async function ingestPlayerGameLogs(seasonId: number): Promise<void> {
 // 8. Ingest injuries from NBA injury report
 // ============================================================
 async function ingestInjuries(seasonId: number): Promise<void> {
-  step("8/9  Ingesting injury report");
-  await sleep(DELAY_MS);
+  step("8/9  Ingesting injury report (ESPN)");
 
-  // Clear old injuries first
+  // Clear old injuries
   await sql`UPDATE player_injuries SET is_current = false WHERE season_id = ${seasonId}`;
 
-  const url = `https://cdn.nba.com/static/json/liveData/odds/odds_todaysGames.json`;
+  const injuries: { name: string; status: string; injury: string; body: string }[] = [];
 
-  // Try the official injury report endpoint
+  // ESPN public injury API — returns all 30 teams with current injuries
   try {
-    const injUrl = `https://stats.nba.com/stats/playerindex?Season=${SEASON}&LeagueID=00&Historical=0`;
-    const data = await nbaFetch(injUrl);
-    // playerindex doesn't have injury data directly, try a different approach
-  } catch (e: any) {
-    console.log(`  NBA stats injury endpoint failed: ${e.message}`);
-  }
+    const url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries";
+    const resp = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!resp.ok) throw new Error(`ESPN ${resp.status}`);
+    const data = await resp.json();
 
-  // Use known current injuries (manually maintained for accuracy)
-  // In production this would be scraped from official NBA injury reports
-  const knownInjuries: { name: string; status: string; injury: string; body: string }[] = [
-    // Known injured players as of late March 2026
-    // These would normally be scraped from the NBA injury report API
-    { name: "Domantas Sabonis", status: "Out", injury: "Knee", body: "knee" },
-    { name: "Kawhi Leonard", status: "Out", injury: "Knee", body: "knee" },
-    { name: "Zion Williamson", status: "Out", injury: "Hamstring", body: "hamstring" },
-    { name: "Kristaps Porzingis", status: "Out", injury: "Ankle", body: "ankle" },
-    { name: "Chet Holmgren", status: "Out", injury: "Hip", body: "hip" },
-    { name: "Jimmy Butler", status: "Out", injury: "Suspension", body: "other" },
-    { name: "Joel Embiid", status: "Questionable", injury: "Knee", body: "knee" },
-    { name: "Ja Morant", status: "Questionable", injury: "Back", body: "back" },
-    { name: "Giannis Antetokounmpo", status: "Questionable", injury: "Knee", body: "knee" },
-  ];
+    const teams = data.injuries || [];
+    console.log(`  ESPN returned injury data for ${teams.length} teams`);
 
-  // Try to fetch from the NBA CDN scoreboard for today's injury info
-  try {
-    const cdnUrl = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json";
-    const resp = await fetch(cdnUrl, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", Referer: "https://www.nba.com/" } });
-    if (resp.ok) {
-      const data = await resp.json();
-      const games = data?.scoreboard?.games || [];
-      for (const game of games) {
-        // Check home team injuries
-        for (const player of (game.homeTeam?.players || [])) {
-          if (player.status === "INACTIVE" || player.notPlayingReason) {
-            knownInjuries.push({
-              name: `${player.firstName} ${player.familyName}`,
-              status: "Out",
-              injury: player.notPlayingReason || "Inactive",
-              body: "other",
-            });
+    for (const team of teams) {
+      const teamInjuries = team.injuries || [];
+      for (const inj of teamInjuries) {
+        const name = inj.athlete?.displayName || "";
+        if (!name) continue;
+
+        // Map ESPN status to our format
+        let status = "Questionable";
+        const espnStatus = (inj.status || "").toLowerCase();
+        if (espnStatus === "out" || espnStatus.includes("out")) status = "Out";
+        else if (espnStatus === "doubtful") status = "Doubtful";
+        else if (espnStatus === "day-to-day" || espnStatus === "questionable") status = "Questionable";
+        else if (espnStatus === "probable") status = "Questionable"; // treat probable as minor
+
+        // Extract injury type from comment
+        const comment = inj.shortComment || inj.longComment || "";
+        let injuryType = "Unknown";
+        let bodyPart = "other";
+
+        // Parse body part from comment
+        const bodyParts: [RegExp, string, string][] = [
+          [/knee/i, "Knee", "knee"],
+          [/ankle/i, "Ankle", "ankle"],
+          [/hamstring/i, "Hamstring", "hamstring"],
+          [/shoulder/i, "Shoulder", "shoulder"],
+          [/back/i, "Back", "back"],
+          [/hip/i, "Hip", "hip"],
+          [/foot/i, "Foot", "foot"],
+          [/calf/i, "Calf", "calf"],
+          [/wrist/i, "Wrist", "wrist"],
+          [/quad/i, "Quad", "quad"],
+          [/groin/i, "Groin", "groin"],
+          [/concussion/i, "Concussion", "head"],
+          [/illness/i, "Illness", "other"],
+          [/rest/i, "Rest", "other"],
+          [/personal/i, "Personal", "other"],
+          [/suspension/i, "Suspension", "other"],
+          [/achilles/i, "Achilles", "achilles"],
+          [/thumb/i, "Thumb", "hand"],
+          [/finger/i, "Finger", "hand"],
+          [/elbow/i, "Elbow", "elbow"],
+          [/toe/i, "Toe", "foot"],
+          [/thigh/i, "Thigh", "thigh"],
+          [/rib/i, "Ribs", "torso"],
+          [/oblique/i, "Oblique", "torso"],
+          [/abdom/i, "Abdomen", "torso"],
+        ];
+
+        for (const [regex, type, part] of bodyParts) {
+          if (regex.test(comment) || regex.test(name)) {
+            injuryType = type;
+            bodyPart = part;
+            break;
           }
         }
-        // Check away team injuries
-        for (const player of (game.awayTeam?.players || [])) {
-          if (player.status === "INACTIVE" || player.notPlayingReason) {
-            knownInjuries.push({
-              name: `${player.firstName} ${player.familyName}`,
-              status: "Out",
-              injury: player.notPlayingReason || "Inactive",
-              body: "other",
-            });
-          }
-        }
+
+        injuries.push({ name, status, injury: injuryType, body: bodyPart });
       }
     }
+
+    console.log(`  Parsed ${injuries.length} injury records from ESPN`);
   } catch (e: any) {
-    console.log(`  CDN scoreboard injury data failed: ${e.message}`);
+    console.log(`  ESPN injury fetch failed: ${e.message}`);
+  }
+
+  if (injuries.length === 0) {
+    console.log("  No injury data available. Skipping.");
+    return;
   }
 
   // Match to DB players and insert
@@ -772,12 +790,17 @@ async function ingestInjuries(seasonId: number): Promise<void> {
     FROM players p
     JOIN rosters r ON r.player_id = p.id AND r.season_id = ${seasonId}
   `;
-  const playerMap = new Map(playerRows.map((r) => [String(r.full_name).toLowerCase(), { id: r.id, teamId: r.team_id }]));
+
+  // Build lookup map with lowercase names
+  const playerMap = new Map<string, { id: number; teamId: number }>();
+  for (const r of playerRows) {
+    playerMap.set(String(r.full_name).toLowerCase(), { id: Number(r.id), teamId: Number(r.team_id) });
+  }
 
   let inserted = 0;
   const seen = new Set<number>();
 
-  for (const inj of knownInjuries) {
+  for (const inj of injuries) {
     const match = playerMap.get(inj.name.toLowerCase());
     if (!match || seen.has(match.id)) continue;
     seen.add(match.id);
@@ -795,7 +818,13 @@ async function ingestInjuries(seasonId: number): Promise<void> {
     inserted++;
   }
 
-  console.log(`  Inserted ${inserted} current injury records`);
+  // Print summary by status
+  const outCount = injuries.filter((i) => i.status === "Out").length;
+  const dayCount = injuries.filter((i) => i.status === "Questionable").length;
+  const doubtCount = injuries.filter((i) => i.status === "Doubtful").length;
+
+  console.log(`  Matched ${inserted} of ${injuries.length} injured players to DB`);
+  console.log(`  Breakdown: ${outCount} Out, ${doubtCount} Doubtful, ${dayCount} Questionable/Day-to-Day`);
 }
 
 // ============================================================
