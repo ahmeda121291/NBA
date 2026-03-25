@@ -303,20 +303,18 @@ export function DataTable<T>({
                       }`}
                       onClick={() => col.sortable && handleSort(col.key)}
                     >
-                      <div className={`flex items-center gap-1 ${justifyCls}`}>
-                        {col.isMetric && col.metricKey ? (
-                          <MetricTooltip metricKey={col.metricKey}>
-                            <span className="text-indigo-400/80">{col.label}</span>
-                          </MetricTooltip>
-                        ) : (
-                          <span>{col.label}</span>
-                        )}
-                        {col.sortable && sortKey === col.key && (
-                          sortDir === "desc"
-                            ? <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" />
-                            : <ChevronUp className="h-3 w-3 text-indigo-400 shrink-0" />
-                        )}
-                      </div>
+                      {col.isMetric && col.metricKey ? (
+                        <MetricTooltip metricKey={col.metricKey}>
+                          <span className="text-indigo-400/80">{col.label}</span>
+                        </MetricTooltip>
+                      ) : (
+                        col.label
+                      )}
+                      {col.sortable && sortKey === col.key && (
+                        sortDir === "desc"
+                          ? <ChevronDown className="h-3 w-3 text-indigo-400 inline ml-0.5" />
+                          : <ChevronUp className="h-3 w-3 text-indigo-400 inline ml-0.5" />
+                      )}
                     </th>
                   );
                 })}
