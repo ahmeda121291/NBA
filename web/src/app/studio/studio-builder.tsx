@@ -13,7 +13,8 @@ import { Download, Grid3X3, Trophy, BarChart3, TrendingUp, Zap, Users, Search, X
 // ============================================================
 
 interface PlayerData {
-  id: number; name: string; team: string; position: string;
+  id: number; name: string; team: string; conference: string; position: string;
+  gp: number; draftYear: number;
   ppg: number; rpg: number; apg: number; spg: number; bpg: number;
   mpg: number; topg: number;
   fg_pct: number; fg3_pct: number; ft_pct: number;
@@ -105,6 +106,10 @@ export function StudioBuilder({ players, teams }: Props) {
   const [metric, setMetric] = useState("bis");
   const [search, setSearch] = useState("");
   const [posFilter, setPosFilter] = useState("All");
+  const [confFilter, setConfFilter] = useState("All");
+  const [minMpg, setMinMpg] = useState(0);
+  const [expFilter, setExpFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("All");
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [topN, setTopN] = useState(10);
@@ -153,13 +158,36 @@ export function StudioBuilder({ players, teams }: Props) {
     setSearch("");
   };
 
+  const allTeamAbbrs = useMemo(() =>
+    [...new Set(players.map(p => p.team).filter(Boolean))].sort(),
+    [players]
+  );
+
+  const getFilteredPlayers = useCallback(() => {
+    return players.filter(p => {
+      if (posFilter !== "All" && !p.position?.includes(posFilter)) return false;
+      if (confFilter !== "All" && p.conference !== confFilter) return false;
+      if (minMpg > 0 && p.mpg < minMpg) return false;
+      if (teamFilter !== "All" && p.team !== teamFilter) return false;
+      if (expFilter === "rookie" && p.draftYear !== 2025) return false;
+      if (expFilter === "sophomore" && p.draftYear !== 2024) return false;
+      if (expFilter === "young" && (p.draftYear < 2022 || p.draftYear === 0)) return false;
+      if (expFilter === "veteran" && (p.draftYear >= 2022 || p.draftYear === 0)) return false;
+      if ((p.bis ?? 0) <= 0 && p.ppg <= 0) return false;
+      return true;
+    }).sort((a, b) => (b.bis ?? 0) - (a.bis ?? 0));
+  }, [players, posFilter, confFilter, minMpg, teamFilter, expFilter]);
+
   const filteredSearch = useMemo(() => {
     if (search.length < 2) return [];
     return players
       .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
       .filter(p => posFilter === "All" || p.position?.includes(posFilter))
+      .filter(p => confFilter === "All" || p.conference === confFilter)
+      .filter(p => teamFilter === "All" || p.team === teamFilter)
+      .filter(p => minMpg <= 0 || p.mpg >= minMpg)
       .slice(0, 12);
-  }, [search, players, posFilter]);
+  }, [search, players, posFilter, confFilter, teamFilter, minMpg]);
 
   const topNPlayers = useMemo(() =>
     [...players].filter(p => getVal(p, metric) > 0)
@@ -303,28 +331,101 @@ export function StudioBuilder({ players, teams }: Props) {
               {chartType === "stat-card" ? "Select Player" : `Players (${selectedPlayers.length})`}
             </h3>
 
-            {/* Position filter chips */}
-            <div className="flex gap-1">
-              {["All", "G", "F", "C"].map(pos => (
-                <button
-                  key={pos}
-                  onClick={() => setPosFilter(pos)}
-                  className={`px-2 py-0.5 text-[9px] font-bold rounded border transition-all ${
-                    posFilter === pos ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-400" : "border-white/[0.06] text-text-muted/50"
-                  }`}
+            {/* Smart Filters */}
+            <div className="space-y-2">
+              {/* Row 1: Position */}
+              <div>
+                <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Position</label>
+                <div className="flex gap-1">
+                  {["All", "PG", "SG", "SF", "PF", "C"].map(pos => (
+                    <button
+                      key={pos}
+                      onClick={() => setPosFilter(pos)}
+                      className={`px-2 py-0.5 text-[9px] font-bold rounded border transition-all ${
+                        posFilter === pos ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-400" : "border-white/[0.06] text-text-muted/50"
+                      }`}
+                    >
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 2: Conference */}
+              <div>
+                <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Conference</label>
+                <div className="flex gap-1">
+                  {["All", "East", "West"].map(conf => (
+                    <button
+                      key={conf}
+                      onClick={() => setConfFilter(conf)}
+                      className={`px-2 py-0.5 text-[9px] font-bold rounded border transition-all ${
+                        confFilter === conf ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-400" : "border-white/[0.06] text-text-muted/50"
+                      }`}
+                    >
+                      {conf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 3: Minutes + Experience */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Min MPG</label>
+                  <select
+                    value={minMpg}
+                    onChange={(e) => setMinMpg(Number(e.target.value))}
+                    className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
+                  >
+                    <option value={0}>Any</option>
+                    <option value={10}>10+ MPG</option>
+                    <option value={15}>15+ MPG</option>
+                    <option value={20}>20+ MPG</option>
+                    <option value={25}>25+ MPG</option>
+                    <option value={30}>30+ MPG</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Experience</label>
+                  <select
+                    value={expFilter}
+                    onChange={(e) => setExpFilter(e.target.value)}
+                    className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
+                  >
+                    <option value="all">All Players</option>
+                    <option value="rookie">Rookies (2025)</option>
+                    <option value="sophomore">Sophomores (2024)</option>
+                    <option value="young">Young (draft 2022+)</option>
+                    <option value="veteran">Veterans (pre-2022)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 4: Team */}
+              <div>
+                <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Team</label>
+                <select
+                  value={teamFilter}
+                  onChange={(e) => setTeamFilter(e.target.value)}
+                  className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
                 >
-                  {pos}
-                </button>
-              ))}
+                  <option value="All">All Teams</option>
+                  {allTeamAbbrs.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            {/* Search */}
             <div className="relative">
               <div className="flex items-center gap-1.5 bg-[#141925] border border-white/[0.1] rounded-lg px-3 py-2">
                 <Search className="h-3.5 w-3.5 text-text-muted/50" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search players..."
+                  placeholder="Search by name..."
                   className="bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted/30 w-full"
                 />
               </div>
@@ -344,9 +445,29 @@ export function StudioBuilder({ players, teams }: Props) {
               )}
             </div>
 
+            {/* Quick-add from filters */}
             {chartType !== "stat-card" && (
               <>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const filtered = getFilteredPlayers();
+                      setSelectedPlayers(filtered.slice(0, 50));
+                    }}
+                    className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 rounded px-2 py-1 hover:bg-indigo-500/10 transition-all"
+                  >
+                    Add all filtered ({getFilteredPlayers().length > 50 ? "50 max" : getFilteredPlayers().length})
+                  </button>
+                  {selectedPlayers.length > 0 && (
+                    <button
+                      onClick={() => setSelectedPlayers([])}
+                      className="text-[10px] text-rose-400/70 hover:text-rose-400"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto">
                   {selectedPlayers.map(p => (
                     <span key={p.id} className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full px-2.5 py-0.5 flex items-center gap-1">
                       {p.name.split(" ").pop()} <span className="text-text-muted/50">{p.team}</span>
@@ -354,19 +475,6 @@ export function StudioBuilder({ players, teams }: Props) {
                     </span>
                   ))}
                 </div>
-                {chartType === "quadrant" && selectedPlayers.length === 0 && (
-                  <div className="flex gap-2">
-                    <button onClick={() => setSelectedPlayers(players.filter(p => (p.bis ?? 0) > 0).slice(0, 50))} className="text-[10px] text-indigo-400 hover:underline">
-                      Top 50 by BIS
-                    </button>
-                    <button onClick={() => setSelectedPlayers(players.filter(p => p.ppg >= 15))} className="text-[10px] text-indigo-400 hover:underline">
-                      All 15+ PPG
-                    </button>
-                    <button onClick={() => setSelectedPlayers(players.filter(p => p.mpg >= 25).slice(0, 60))} className="text-[10px] text-indigo-400 hover:underline">
-                      Starters (25+ MPG)
-                    </button>
-                  </div>
-                )}
               </>
             )}
           </div>
