@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { ChevronUp, ChevronDown, Columns, LayoutGrid, Download } from "lucide-react";
+import { ChevronUp, ChevronDown, Columns, LayoutGrid, Download, Search, X } from "lucide-react";
 import { MetricTooltip } from "./metric-tooltip";
 
 export interface Column<T> {
@@ -29,6 +29,107 @@ export interface ViewPreset {
   key: string;
   label: string;
   columns: string[];
+}
+
+/** Searchable dropdown filter for large option sets (e.g., 30 teams) */
+function DropdownFilter({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filtered = search
+    ? options.filter((o) => o.toLowerCase().includes(search.toLowerCase()))
+    : options;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-sm border transition-all ${
+          value !== "All"
+            ? "bg-[rgba(129,140,248,0.12)] text-indigo-400 border-[rgba(129,140,248,0.25)]"
+            : "text-text-muted/70 border-white/[0.08] hover:border-white/[0.15] hover:text-text-muted"
+        }`}
+      >
+        {value === "All" ? label : value}
+        {value !== "All" && (
+          <X
+            className="h-3 w-3 ml-0.5 hover:text-white"
+            onClick={(e) => { e.stopPropagation(); onChange("All"); }}
+          />
+        )}
+        <ChevronDown className="h-3 w-3 ml-0.5" />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-50 rounded-md overflow-hidden"
+          style={{
+            background: "linear-gradient(145deg, rgba(10, 18, 35, 0.99) 0%, rgba(4, 8, 18, 0.97) 100%)",
+            border: "1px solid rgba(129, 140, 248, 0.15)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.7)",
+            minWidth: "180px",
+            maxHeight: "280px",
+          }}
+        >
+          <div className="p-2 border-b border-white/[0.06]">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04]">
+              <Search className="h-3 w-3 text-text-muted/50" />
+              <input
+                type="text"
+                placeholder={`Search ${label.toLowerCase()}...`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="bg-transparent text-[11px] text-text-primary outline-none placeholder:text-text-muted/40 w-full"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto max-h-[220px]">
+            <button
+              onClick={() => { onChange("All"); setOpen(false); setSearch(""); }}
+              className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+                value === "All" ? "text-indigo-400 bg-indigo-500/10" : "text-text-muted/70 hover:text-text-primary hover:bg-white/[0.04]"
+              }`}
+            >
+              All {label}s
+            </button>
+            {filtered.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => { onChange(opt); setOpen(false); setSearch(""); }}
+                className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+                  value === opt ? "text-indigo-400 bg-indigo-500/10" : "text-text-muted/70 hover:text-text-primary hover:bg-white/[0.04]"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-[10px] text-text-muted/40">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface DataTableProps<T> {
@@ -183,23 +284,42 @@ export function DataTable<T>({
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          {filters.map((f) => (
-            <div key={f.key} className="flex items-center gap-1">
-              {["All", ...f.options].map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setFilter(f.key, opt)}
-                  className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all rounded-sm ${
-                    (activeFilters[f.key] ?? "All") === opt
-                      ? "bg-[rgba(129,140,248,0.12)] text-indigo-400 border border-[rgba(129,140,248,0.25)]"
-                      : "text-text-muted/60 border border-transparent hover:text-text-muted hover:border-white/[0.06]"
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          ))}
+          {filters.map((f) => {
+            const isDropdown = f.options.length > 8;
+            const activeVal = activeFilters[f.key] ?? "All";
+
+            if (isDropdown) {
+              // Searchable dropdown for many options (e.g., 30 teams)
+              return (
+                <DropdownFilter
+                  key={f.key}
+                  label={f.label}
+                  options={f.options}
+                  value={activeVal}
+                  onChange={(val) => setFilter(f.key, val)}
+                />
+              );
+            }
+
+            // Chip buttons for few options (e.g., 5 positions)
+            return (
+              <div key={f.key} className="flex items-center gap-1">
+                {["All", ...f.options].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setFilter(f.key, opt)}
+                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all rounded-sm ${
+                      activeVal === opt
+                        ? "bg-[rgba(129,140,248,0.12)] text-indigo-400 border border-[rgba(129,140,248,0.25)]"
+                        : "text-text-muted/60 border border-transparent hover:text-text-muted hover:border-white/[0.06]"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
 
           {presets.length > 0 && (
             <>
