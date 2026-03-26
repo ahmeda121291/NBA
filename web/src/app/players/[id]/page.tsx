@@ -41,8 +41,12 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   const salary = p.salary ? Number(p.salary) : null;
   const vfm = p.vfm ? Number(p.vfm) : null;
   const salaryRank = p.salary_rank ? Number(p.salary_rank) : null;
-  const vfmLabel = vfm !== null ? (vfm > 5 ? "Underpaid" : vfm >= 2 ? "Fair Value" : "Overpaid") : null;
-  const vfmLabelCls = vfm !== null ? (vfm > 5 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : vfm >= 2 ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20") : "";
+  // VFM thresholds scale by salary tier — max players can't have high VFM by math
+  const salaryM = salary ? salary / 1_000_000 : 0;
+  const underpaidThreshold = salaryM > 40 ? 1.6 : salaryM > 20 ? 3 : 5;
+  const fairThreshold = salaryM > 40 ? 1.0 : salaryM > 20 ? 1.5 : 2;
+  const vfmLabel = vfm !== null ? (vfm >= underpaidThreshold ? "Great Value" : vfm >= fairThreshold ? "Fair Value" : "Overpaid") : null;
+  const vfmLabelCls = vfm !== null ? (vfm >= underpaidThreshold ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : vfm >= fairThreshold ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20") : "";
 
   const metrics = [
     { key: "BIS", label: "Baseline Impact Score", score: bis, icon: Activity, desc: "Overall per-game value blending offense, defense, and efficiency" },
