@@ -67,6 +67,13 @@ async function main() {
   // =========================================================================
   console.log("--- Computing Player Metrics (v2) ---");
 
+  // Pre-load team DRTG for on/off court impact calculation
+  const teamDrtgRows = await sql`
+    SELECT team_id, drtg FROM team_season_stats WHERE season_id = ${seasonId}
+  `;
+  const teamDrtgMap: Record<number, number> = {};
+  for (const t of teamDrtgRows) teamDrtgMap[t.team_id] = Number(t.drtg || 112);
+
   const playerStats = await sql`
     SELECT
       pss.*,
@@ -299,57 +306,54 @@ async function main() {
     const posDefAvg = posAvgDef[posGroup] || posAvgDef.G;
 
     if (hasDefData) {
-      // DEF_RATING: compare to POSITIONAL average (not league avg)
-      // Centers avg ~108 DEF_RTG, guards avg ~114. Comparing to league avg overrates Cs.
-      const posDefRtgAvg = posDefAvg.defRating || 112;
-      const defRtgNorm = defRating > 0 ? clamp(50 + (posDefRtgAvg - defRating) * 4, 0, 100) : 50;
+      // ============================================================
+      // DRS v7: RAW STATS + MINUTES/GP + LOAD + DETERRENCE + ON/OFF
+      // ============================================================
+      // RAW counting stats (not per-36) because VOLUME matters.
+      // Heavy-minute defenders who sustain elite D over full seasons > part-timers.
+      // D_FGA = "are you guarding the best players?" signal.
 
-      // Contested shots: compare to POSITIONAL average
-      const contestVsPos = posDefAvg.contested > 0
-        ? clamp(50 + (contestedShots - posDefAvg.contested) / (posDefAvg.contested * 0.3) * 15, 10, 90)
-        : 50;
+      // 1. DETERRENCE (18%) — opponent FG% impact
+      const oppFgDiff = parseFloat(ps.opp_fg_pct_diff || "0");
+      const hasDeterrenceData = ps.opp_fg_pct_diff != null && ps.opp_fg_pct_diff !== "";
+      const deterrenceScore = hasDeterrenceData
+        ? clamp(50 + (oppFgDiff * -100) * 5, 0, 100) : 50;
 
-      // Deflections: compare to POSITIONAL average — wings should shine here
-      const deflVsPos = posDefAvg.deflections > 0
-        ? clamp(50 + (deflections - posDefAvg.deflections) / (posDefAvg.deflections * 0.3) * 15, 10, 90)
-        : 50;
+      // 2. ON/OFF IMPACT (12%) — team defense without you
+      const teamDrtgVal = teamDrtgMap[Number(ps.team_id)] || 112;
+      const onOffImpact = teamDrtgVal - defRating;
+      const onOffScore = clamp(50 + onOffImpact * 7, 0, 100);
 
-      // STL per 36 min — perimeter defense proxy (wings valued more)
-      const stlPer36 = mpg > 0 ? (spg / mpg) * 36 : 0;
-      const posStlAvg = posDefAvg.stl > 0 && posDefAvg.count > 0 ? posDefAvg.stl : 1;
-      const stlPer36Norm = clamp(50 + (stlPer36 - posStlAvg) * 15, 10, 90);
+      // 3-6. RAW COUNTING STATS (contests 15%, defl 12%, stl 10%, blk 7%)
+      const contestScore = clamp(contestedShots * 7.5, 0, 100);
+      const deflScore = clamp(deflections * 22, 0, 100);
+      const stlScore = clamp(spg * 40, 0, 100);
+      const blkScore = clamp(bpg * 28, 0, 100);
 
-      // BLK per 36 — rim protection (bigs still get credit but relative to other bigs)
-      const blkPer36 = mpg > 0 ? (bpg / mpg) * 36 : 0;
-      const posBlkAvg = posDefAvg.blk > 0 && posDefAvg.count > 0 ? posDefAvg.blk : 0.5;
-      const blkPer36Norm = clamp(50 + (blkPer36 - posBlkAvg) * 12, 10, 90);
+      // 7. DEFENSIVE LOAD (8%) — how many FGA opponents take against you
+      const dFga = parseFloat(ps.d_fga || "0");
+      const loadScore = clamp(dFga * 5.5, 0, 100);
 
-      // DEF_WS (cumulative) — still useful as a volume measure
-      const defWsNorm = defWs > 0 ? clamp(normalize(defWs * gp, 1.5, 1.2), 0, 100) : 50;
+      // 8. MINUTES + GP BONUS (8%) — sustained heavy-minute defenders
+      const minutesRaw = clamp((mpg - 15) * 4, 0, 100);
+      const gpFactor = clamp(0.5 + (gp / 70) * 0.5, 0.5, 1.0);
+      const minutesScore = minutesRaw * gpFactor;
 
-      // Hustle: loose balls only (removed box outs — too big-biased)
-      const looseBallNorm = clamp(50 + (looseBalls - (posDefAvg.looseBalls || 0.5)) * 20, 10, 90);
+      // 9. VERSATILITY (5%) — perimeter + interior actions both present
+      const perimActions = spg + deflections;
+      const interiorActions = bpg + contestedShots * 0.15;
+      const versatilityBonus = (perimActions > 2.5 && interiorActions > 1.5)
+        ? Math.min((perimActions + interiorActions) * 3, 15) : 0;
 
-      // Charges drawn — everyone gets credit equally (rare for all positions)
-      const chargeNorm = chargesDrawn > 0.1 ? clamp(50 + chargesDrawn * 30, 50, 90) : 50;
+      // 10. HUSTLE (5%) — loose balls + charges
+      const hustleScore = clamp((looseBalls + chargesDrawn) * 30, 0, 100);
 
-      // WEIGHTS — DEF_RATING is king. If your DEF_RATING is bad, hustle stats can't save you.
-      const rawDrs =
-        defRtgNorm * 0.45 +       // DEF_RATING vs position avg (THE metric)
-        deflVsPos * 0.15 +         // Deflections vs position avg
-        stlPer36Norm * 0.10 +      // Steals per 36 (perimeter proxy)
-        contestVsPos * 0.08 +      // Contested shots vs position avg
-        blkPer36Norm * 0.07 +      // Blocks per 36 vs position avg
-        defWsNorm * 0.07 +         // Defensive win shares
-        looseBallNorm * 0.04 +     // Loose balls (hustle)
-        chargeNorm * 0.04;         // Charges drawn
-
-      // CAP: if DEF_RATING is WORSE than position avg, cap DRS at 65 max
-      // You can't be "elite" if your team is worse when you're on court defending
-      const defRtgAboveAvg = defRating - posDefRtgAvg; // positive = worse than avg
-      const drsCap = defRtgAboveAvg > 0 ? Math.max(65 - defRtgAboveAvg * 3, 30) : 100;
-
-      drs = clamp(Math.min(rawDrs, drsCap), 0, 100);
+      drs = clamp(
+        deterrenceScore * 0.18 + contestScore * 0.15 + onOffScore * 0.12 +
+        deflScore * 0.12 + stlScore * 0.10 + loadScore * 0.08 +
+        minutesScore * 0.08 + blkScore * 0.07 + versatilityBonus * 0.05 +
+        hustleScore * 0.05, 0, 100
+      );
     } else {
       // Fallback: box score only, position-relative, capped at 65
       const posStlAvg = posDefAvg.stl || 1;
@@ -546,7 +550,7 @@ async function main() {
       drsConfidence: Math.round(drsConfidence * 100) / 100,
       drsLabel,
       drsComponents: hasDefData
-        ? { defRtg: defRating, posDefRtgAvg: posDefAvg.defRating, contested: contestedShots, posContestAvg: posDefAvg.contested, deflections, posDeflAvg: posDefAvg.deflections, stlPer36: mpg > 0 ? (spg / mpg * 36).toFixed(1) : 0, blkPer36: mpg > 0 ? (bpg / mpg * 36).toFixed(1) : 0, posGroup }
+        ? { oppFgDiff: oppFgDiff.toFixed(3), deterrence: deterrenceScore.toFixed(0), onOff: onOffScore.toFixed(0), onOffImpact: onOffImpact.toFixed(1), contested: contestedShots, deflections, stl: spg, blk: bpg, dFga, mpg, gp, versatility: versatilityBonus.toFixed(1), posGroup }
         : { stl: spg, blk: bpg, posGroup, boxScoreOnly: true },
       lfi: Math.round(lfi * 100) / 100,
       lfiConfidence: Math.round(lfiConfidence * 100) / 100,

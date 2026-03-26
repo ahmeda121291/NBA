@@ -470,6 +470,9 @@ async function ingestDefensiveAndHustleStats(seasonId: number): Promise<void> {
       ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_pts_paint DECIMAL(5,2);
       ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_pts_fb DECIMAL(5,2);
       ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_pts_2nd DECIMAL(5,2);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_fg_pct DECIMAL(5,4);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS opp_fg_pct_diff DECIMAL(5,4);
+      ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS d_fga DECIMAL(5,2);
     EXCEPTION WHEN duplicate_column THEN NULL;
     END $$;
   `.catch(() => {});
@@ -545,6 +548,46 @@ async function ingestDefensiveAndHustleStats(seasonId: number): Promise<void> {
     console.log(`  Updated defensive stats for ${updated} players`);
   } catch (e: any) {
     console.log(`  Defensive stats failed: ${e.message}`);
+  }
+
+  // 3. Defensive matchup data (opponent FG% when defended — THE deterrence metric)
+  await sleep(DELAY_MS);
+  try {
+    const url = `https://stats.nba.com/stats/leaguedashptdefend?Season=${SEASON}&SeasonType=Regular+Season&LeagueID=00&PerMode=PerGame&DefenseCategory=Overall`;
+    const resp = await fetch(url, { headers: NBA_HEADERS });
+    if (!resp.ok) throw new Error(`Matchup API ${resp.status}`);
+    const data = await resp.json();
+    const headers: string[] = data.resultSets[0].headers;
+    const rowData: any[][] = data.resultSets[0].rowSet;
+    const rows = rowData.map((r) => {
+      const obj: any = {};
+      headers.forEach((h, i) => (obj[h] = r[i]));
+      return obj;
+    });
+    console.log(`  Got defensive matchup data for ${rows.length} players`);
+
+    // Match by player ID
+    let updated = 0;
+    for (const row of rows) {
+      const pid = playerMap.get(String(row.CLOSE_DEF_PERSON_ID));
+      if (!pid) continue;
+
+      const oppFgPct = row.D_FG_PCT || null;
+      const oppFgPctDiff = row.PCT_PLUSMINUS || null;  // negative = opponents shoot worse
+      const dFga = row.D_FGA || null;
+
+      await sql`
+        UPDATE player_season_stats SET
+          opp_fg_pct = ${oppFgPct},
+          opp_fg_pct_diff = ${oppFgPctDiff},
+          d_fga = ${dFga}
+        WHERE player_id = ${pid} AND season_id = ${seasonId}
+      `;
+      updated++;
+    }
+    console.log(`  Updated matchup deterrence data for ${updated} players`);
+  } catch (e: any) {
+    console.log(`  Matchup data failed: ${e.message}`);
   }
 }
 
