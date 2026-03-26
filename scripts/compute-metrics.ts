@@ -118,10 +118,25 @@ async function main() {
     else posGroups.G.push(p);
   }
   const posAvgUsg: Record<string, number> = {};
-  for (const [pos, players] of Object.entries(posGroups)) {
-    posAvgUsg[pos] = players.length > 0
-      ? players.reduce((s, p) => s + num(p.usg_pct), 0) / players.length
+  // Position averages for defensive stats (DRS v3)
+  const posAvgDef: Record<string, { contested: number; deflections: number; stl: number; blk: number; looseBalls: number; boxOuts: number; defRating: number; count: number }> = {};
+  for (const [pos, plist] of Object.entries(posGroups)) {
+    posAvgUsg[pos] = plist.length > 0
+      ? plist.reduce((s, p) => s + num(p.usg_pct), 0) / plist.length
       : avg.usg_pct;
+
+    const qualified = plist.filter(p => num(p.mpg) >= 15);
+    const cnt = qualified.length || 1;
+    posAvgDef[pos] = {
+      contested: qualified.reduce((s, p) => s + num(p.contested_shots), 0) / cnt,
+      deflections: qualified.reduce((s, p) => s + num(p.deflections), 0) / cnt,
+      stl: qualified.reduce((s, p) => s + num(p.spg), 0) / cnt,
+      blk: qualified.reduce((s, p) => s + num(p.bpg), 0) / cnt,
+      looseBalls: qualified.reduce((s, p) => s + num(p.loose_balls), 0) / cnt,
+      boxOuts: qualified.reduce((s, p) => s + num(p.box_outs), 0) / cnt,
+      defRating: qualified.reduce((s, p) => s + num(p.def_rating), 0) / cnt,
+      count: cnt,
+    };
   }
 
   // ---- Game logs for LFI + GOI ----
@@ -275,44 +290,77 @@ async function main() {
     const oiqLabel = "placeholder";
 
     // ==================================================================
-    // DRS v2 — Real defensive data (already rebuilt)
+    // DRS v3 — Position-relative defensive scoring
+    // Bigs compared to bigs, wings to wings, guards to guards
+    // No more inflating bigs with raw contested shots / blocks
     // ==================================================================
     const hasDefData = defRating > 0 || contestedShots > 0;
     let drs: number;
+    const posDefAvg = posAvgDef[posGroup] || posAvgDef.G;
 
     if (hasDefData) {
-      const defRtgNorm = defRating > 0 ? clamp(50 + (112 - defRating) * 3, 0, 100) : 50;
-      const defWsNorm = defWs > 0 ? clamp(normalize(defWs * gp, 1.5, 1.2), 0, 100) : 50;
-      const contestNorm = normalize(contestedShots, avg.contested_shots || 4.5, std.contested_shots || 2.5);
-      const deflNorm = normalize(deflections, avg.deflections || 2.0, std.deflections || 1.5);
-      const chargeNorm = chargesDrawn > 0 ? clamp(50 + chargesDrawn * 25, 0, 100) : 50;
-      const hustleNorm = normalize(
-        looseBalls + boxOuts * 0.3,
-        (avg.loose_balls || 0.5) + (avg.box_outs || 0.5) * 0.3,
-        (std.loose_balls || 0.5) + (std.box_outs || 0.5) * 0.3
-      );
+      // DEF_RATING: compare to POSITIONAL average (not league avg)
+      // Centers avg ~108 DEF_RTG, guards avg ~114. Comparing to league avg overrates Cs.
+      const posDefRtgAvg = posDefAvg.defRating || 112;
+      const defRtgNorm = defRating > 0 ? clamp(50 + (posDefRtgAvg - defRating) * 4, 0, 100) : 50;
 
+      // Contested shots: compare to POSITIONAL average
+      const contestVsPos = posDefAvg.contested > 0
+        ? clamp(50 + (contestedShots - posDefAvg.contested) / (posDefAvg.contested * 0.3) * 15, 10, 90)
+        : 50;
+
+      // Deflections: compare to POSITIONAL average — wings should shine here
+      const deflVsPos = posDefAvg.deflections > 0
+        ? clamp(50 + (deflections - posDefAvg.deflections) / (posDefAvg.deflections * 0.3) * 15, 10, 90)
+        : 50;
+
+      // STL per 36 min — perimeter defense proxy (wings valued more)
+      const stlPer36 = mpg > 0 ? (spg / mpg) * 36 : 0;
+      const posStlAvg = posDefAvg.stl > 0 && posDefAvg.count > 0 ? posDefAvg.stl : 1;
+      const stlPer36Norm = clamp(50 + (stlPer36 - posStlAvg) * 15, 10, 90);
+
+      // BLK per 36 — rim protection (bigs still get credit but relative to other bigs)
+      const blkPer36 = mpg > 0 ? (bpg / mpg) * 36 : 0;
+      const posBlkAvg = posDefAvg.blk > 0 && posDefAvg.count > 0 ? posDefAvg.blk : 0.5;
+      const blkPer36Norm = clamp(50 + (blkPer36 - posBlkAvg) * 12, 10, 90);
+
+      // DEF_WS (cumulative) — still useful as a volume measure
+      const defWsNorm = defWs > 0 ? clamp(normalize(defWs * gp, 1.5, 1.2), 0, 100) : 50;
+
+      // Hustle: loose balls only (removed box outs — too big-biased)
+      const looseBallNorm = clamp(50 + (looseBalls - (posDefAvg.looseBalls || 0.5)) * 20, 10, 90);
+
+      // Charges drawn — everyone gets credit equally (rare for all positions)
+      const chargeNorm = chargesDrawn > 0.1 ? clamp(50 + chargesDrawn * 30, 50, 90) : 50;
+
+      // WEIGHTS — balanced between rim protection and perimeter D
       drs = clamp(
-        defRtgNorm * 0.35 +
-        contestNorm * 0.20 +
-        deflNorm * 0.15 +
-        defWsNorm * 0.10 +
-        hustleNorm * 0.10 +
-        (spgNorm * 0.5 + bpgNorm * 0.5) * 0.10,
+        defRtgNorm * 0.30 +       // DEF_RATING vs position avg (king metric)
+        deflVsPos * 0.20 +         // Deflections vs position avg (wings shine)
+        stlPer36Norm * 0.15 +      // Steals per 36 (perimeter proxy)
+        contestVsPos * 0.10 +      // Contested shots vs position avg (reduced from 20%)
+        blkPer36Norm * 0.08 +      // Blocks per 36 vs position avg
+        defWsNorm * 0.07 +         // Defensive win shares
+        looseBallNorm * 0.05 +     // Loose balls (hustle)
+        chargeNorm * 0.05,         // Charges drawn
         0, 100
       );
     } else {
-      // Fallback: box score only, capped at 70
-      const drebFactor = isBig ? 0.7 : 0.3;
-      const drebNorm = normalize(rpg * drebFactor, avg.rpg * drebFactor, std.rpg * drebFactor);
-      const posAdj = isBig ? bpgNorm * 0.15 + spgNorm * 0.05 : spgNorm * 0.15 + bpgNorm * 0.05;
-      drs = clamp((spgNorm * 0.25 + bpgNorm * 0.25 + drebNorm * 0.30 + posAdj) * 0.7, 0, 70);
+      // Fallback: box score only, position-relative, capped at 65
+      const posStlAvg = posDefAvg.stl || 1;
+      const posBlkAvg = posDefAvg.blk || 0.5;
+      const stlVsPos = clamp(50 + (spg - posStlAvg) * 15, 10, 90);
+      const blkVsPos = clamp(50 + (bpg - posBlkAvg) * 12, 10, 90);
+      drs = clamp(
+        (isGuard ? stlVsPos * 0.55 + blkVsPos * 0.20 : stlVsPos * 0.25 + blkVsPos * 0.50) +
+        rpgNorm * 0.25,
+        0, 65
+      );
     }
 
-    const drsConfidence = hasDefData ? bisConfidence : bisConfidence * 0.5;
-    const drsLabel = hasDefData
-      ? (drs >= 80 ? "Elite Defender" : drs >= 65 ? "Plus Defender" : drs >= 50 ? "Solid Defender" : drs >= 35 ? "Average Defender" : "Weak Defender")
-      : (drs >= 60 ? "Good (box score est.)" : drs >= 40 ? "Average (box score est.)" : "Below Avg (box score est.)");
+    const drsConfidence = hasDefData ? bisConfidence : bisConfidence * 0.4;
+    // Label will be overwritten by percentile-based tier system
+    const drsLabel = "placeholder";
 
     // ==================================================================
     // LFI v2 — Efficiency trend, +/- trend, weighted recency, 10-game blend
@@ -493,8 +541,8 @@ async function main() {
       drsConfidence: Math.round(drsConfidence * 100) / 100,
       drsLabel,
       drsComponents: hasDefData
-        ? { defRtg: defRating, contested: contestedShots, deflections, defWs, hustle: looseBalls, stl: spg, blk: bpg }
-        : { stl: spg, blk: bpg, boxScoreOnly: true },
+        ? { defRtg: defRating, posDefRtgAvg: posDefAvg.defRating, contested: contestedShots, posContestAvg: posDefAvg.contested, deflections, posDeflAvg: posDefAvg.deflections, stlPer36: mpg > 0 ? (spg / mpg * 36).toFixed(1) : 0, blkPer36: mpg > 0 ? (bpg / mpg * 36).toFixed(1) : 0, posGroup }
+        : { stl: spg, blk: bpg, posGroup, boxScoreOnly: true },
       lfi: Math.round(lfi * 100) / 100,
       lfiConfidence: Math.round(lfiConfidence * 100) / 100,
       lfiStreakLabel,
