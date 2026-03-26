@@ -191,7 +191,7 @@ export default function ComparePage() {
   }, [player1?.id, player2?.id]);
 
   const metricKeys = ["bis", "rda", "drs", "lfi", "sps", "goi"];
-  const metricLabels = ["BIS", "RDA", "DRS", "LFI", "SPS", "GOI"];
+  const metricLabels = ["BIS", "OIQ", "DRS", "LFI", "PEM", "GOI"];
 
   const statComparisons = [
     { key: "ppg", label: "PPG" },

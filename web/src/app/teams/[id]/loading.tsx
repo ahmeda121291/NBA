@@ -41,7 +41,7 @@ export default function TeamDetailLoading() {
       {/* Season stats */}
       <div className="glass-card rounded-2xl p-6">
         <Skeleton variant="text" className="h-3 w-24 mb-4" />
-        <div className="grid grid-cols-4 gap-4 sm:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="text-center space-y-1">
               <Skeleton variant="text" className="h-3 w-8 mx-auto" />

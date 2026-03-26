@@ -77,12 +77,12 @@ export function PlayersTable({ players }: Props) {
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.drs_score))}`}>{fmt(r.drs_score, 0)}</span>,
     },
     {
-      key: "rda", label: "RDA", align: "right", sortable: true, isMetric: true, metricKey: "rda", defaultVisible: false,
+      key: "rda", label: "OIQ", align: "right", sortable: true, isMetric: true, metricKey: "rda", defaultVisible: false,
       sortValue: (r) => num(r.rda_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.rda_score))}`}>{fmt(r.rda_score, 0)}</span>,
     },
     {
-      key: "sps", label: "SPS", align: "right", sortable: true, isMetric: true, metricKey: "sps", defaultVisible: false,
+      key: "sps", label: "PEM", align: "right", sortable: true, isMetric: true, metricKey: "sps", defaultVisible: false,
       sortValue: (r) => num(r.sps_score),
       render: (r) => <span className={`font-stat text-[12px] ${tierClass(num(r.sps_score))}`}>{fmt(r.sps_score, 0)}</span>,
     },

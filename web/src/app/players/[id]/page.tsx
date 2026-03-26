@@ -2,7 +2,7 @@ import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ScoreOrb } from "@/components/ui/score-orb";
 import { RadarChart } from "@/components/ui/radar-chart";
-import { ArrowLeft, TrendingUp, Flame, Shield, Activity, Zap, Target, BarChart3, FileText, Swords } from "lucide-react";
+import { ArrowLeft, TrendingUp, Flame, Shield, Activity, Zap, Target, BarChart3, FileText, Swords, DollarSign } from "lucide-react";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import { getPlayerWithMetrics, getPlayerGameLogs } from "@/lib/db/queries";
 import { getPlayerMatchupSplits } from "@/lib/db/queries/matchups";
@@ -32,15 +32,24 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   const bisPctl = p.bis_percentile ? Number(p.bis_percentile) : null;
   const hasMetrics = bis !== null;
 
-  const radarLabels = ["BIS", "LFI", "DRS", "RDA", "SPS", "GOI"];
-  const radarData = [bis ?? 0, lfi ?? 0, drs ?? 0, rda ?? 0, sps ?? 0, goi ?? 0];
+  const radarLabels = ["BIS", "LFI", "DRS", "OIQ", "PEM", "GOI"];
+  const radarRaw = [bis, lfi, drs, rda, sps, goi];
+  const radarNonNull = radarRaw.filter((v) => v !== null && v !== 0).length;
+  const radarData = radarRaw.map((v) => v ?? 0);
+  const showRadar = radarNonNull >= 2;
+
+  const salary = p.salary ? Number(p.salary) : null;
+  const vfm = p.vfm ? Number(p.vfm) : null;
+  const salaryRank = p.salary_rank ? Number(p.salary_rank) : null;
+  const vfmLabel = vfm !== null ? (vfm > 5 ? "Underpaid" : vfm >= 2 ? "Fair Value" : "Overpaid") : null;
+  const vfmLabelCls = vfm !== null ? (vfm > 5 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : vfm >= 2 ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20") : "";
 
   const metrics = [
     { key: "BIS", label: "Baseline Impact Score", score: bis, icon: Activity, desc: "Overall per-game value blending offense, defense, and efficiency" },
     { key: "LFI", label: "Live Form Index", score: lfi, icon: Flame, desc: "Recent form vs season baseline — momentum and trajectory" },
     { key: "DRS", label: "Defensive Resilience", score: drs, icon: Shield, desc: "Defensive impact: contests, steals, rim protection, versatility" },
-    { key: "RDA", label: "Role-Defined Accuracy", score: rda, icon: Target, desc: "How well the player executes within their assigned team role" },
-    { key: "SPS", label: "Shot Profile Score", score: sps, icon: Zap, desc: "Shot selection efficiency, range, and difficulty adjustment" },
+    { key: "OIQ", label: "Offensive Impact (OIQ)", score: rda, icon: Target, desc: "How hard a player's offensive role is — separating easy-efficiency from high-burden creation" },
+    { key: "PEM", label: "Playmaking Efficiency (PEM)", score: sps, icon: Zap, desc: "Whether player value transfers across different contexts, roles, and lineups" },
     { key: "GOI", label: "Game Outcome Influence", score: goi, icon: BarChart3, desc: "Clutch impact on team wins — close games and high-leverage moments" },
   ];
 
@@ -109,23 +118,25 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
 
       {/* CourtVision Metrics Panel */}
       {hasMetrics && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-6 ${showRadar ? "lg:grid-cols-3" : ""}`}>
           {/* Radar Chart */}
-          <GlassCard variant="accent" className="lg:col-span-1 flex flex-col items-center justify-center">
-            <h2 className="section-header mb-3 text-[10px]">CourtVision Profile</h2>
-            <RadarChart
-              labels={radarLabels}
-              datasets={[{ label: p.full_name, data: radarData, color: "#818cf8" }]}
-              maxValue={100}
-              size={260}
-            />
-            <div className="mt-2 flex items-center gap-1.5">
-              <ScoreOrb score={bis ?? 0} size="sm" label="BIS" />
-            </div>
-          </GlassCard>
+          {showRadar && (
+            <GlassCard variant="accent" className="lg:col-span-1 flex flex-col items-center justify-center">
+              <h2 className="section-header mb-3 text-[10px]">CourtVision Profile</h2>
+              <RadarChart
+                labels={radarLabels}
+                datasets={[{ label: p.full_name, data: radarData, color: "#818cf8" }]}
+                maxValue={100}
+                size={260}
+              />
+              <div className="mt-2 flex items-center gap-1.5">
+                <ScoreOrb score={bis ?? 0} size="sm" label="BIS" />
+              </div>
+            </GlassCard>
+          )}
 
           {/* Metric Cards Grid */}
-          <div className="lg:col-span-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className={`${showRadar ? "lg:col-span-2" : ""} grid grid-cols-2 gap-3 sm:grid-cols-3`}>
             {metrics.map((m) => (
               <div key={m.key} className={`p-4 rounded-lg ${tierBorder(m.score)} relative`}
                 >
@@ -171,6 +182,45 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           ))}
         </div>
       </GlassCard>
+
+      {/* Contract Value */}
+      {salary !== null && (
+        <GlassCard>
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="h-4 w-4 text-emerald-400" />
+            <h2 className="section-header text-[10px]">Contract Value</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Salary</p>
+              <p className="font-stat text-lg font-bold mt-0.5 text-emerald-400">
+                ${(salary / 1_000_000).toFixed(1)}M
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/60">VFM</p>
+              <p className={`font-stat text-lg font-bold mt-0.5 ${vfm !== null ? (vfm > 5 ? "text-emerald-400" : vfm >= 2 ? "text-amber-400" : "text-rose-400") : ""}`}>
+                {vfm?.toFixed(1) ?? "—"}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Salary Rank</p>
+              <p className="font-stat text-lg font-bold mt-0.5">
+                {salaryRank !== null ? `#${salaryRank}` : "—"}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Value</p>
+              {vfmLabel && (
+                <span className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${vfmLabelCls}`}>
+                  {vfmLabel}
+                </span>
+              )}
+              {!vfmLabel && <p className="font-stat text-lg font-bold mt-0.5">—</p>}
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       {/* AI Scouting Report */}
       {hasMetrics && (() => {

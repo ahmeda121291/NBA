@@ -38,9 +38,11 @@ export function Header({ onMenuToggle, userMenu }: HeaderProps) {
             <SearchOverlay />
           </div>
 
-          <button className="relative border border-white/[0.08] bg-white/[0.02] p-2 text-text-muted transition-all duration-200 hover:text-indigo-400 hover:border-indigo-500/20 rounded-lg">
+          <button
+            title="Notifications coming soon"
+            className="relative border border-white/[0.08] bg-white/[0.02] p-2 text-text-muted transition-all duration-200 hover:text-indigo-400 hover:border-indigo-500/20 rounded-lg"
+          >
             <Bell className="h-4 w-4" />
-            <div className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,0.5)]" />
           </button>
 
           {userMenu}

@@ -52,7 +52,7 @@ export function TeamsTable({ teams }: Props) {
       render: (r) => <span className="font-stat font-bold text-rose-400 tabular-nums">{r.losses ?? 0}</span>,
     },
     {
-      key: "winpct", label: "Win%", align: "right", sortable: true, width: "60px",
+      key: "winpct", label: "Win%", align: "right", sortable: true, width: "75px",
       sortValue: (r) => {
         const w = num(r.wins) ?? 0, l = num(r.losses) ?? 0;
         return (w + l) > 0 ? w / (w + l) : 0;
@@ -60,7 +60,7 @@ export function TeamsTable({ teams }: Props) {
       render: (r) => {
         const w = num(r.wins) ?? 0, l = num(r.losses) ?? 0;
         const total = w + l;
-        return <span className="font-stat text-[12px] text-text-secondary">{total > 0 ? (w / total).toFixed(3) : ".000"}</span>;
+        return <span className="font-stat text-[12px] text-text-secondary">{total > 0 ? ((w / total) * 100).toFixed(1) + "%" : "0.0%"}</span>;
       },
     },
     // CourtVision metrics

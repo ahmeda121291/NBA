@@ -12,8 +12,8 @@ const metricTabs = [
   { key: "bis", label: "BIS", fullName: "Baseline Impact Score", icon: Activity, description: "Overall player value — offense, defense, and impact combined" },
   { key: "lfi", label: "LFI", fullName: "Live Form Index", icon: Flame, description: "Current form — who's hot right now" },
   { key: "drs", label: "DRS", fullName: "Defensive Reality Score", icon: Shield, description: "True defensive impact beyond steals and blocks" },
-  { key: "rda", label: "RDA", fullName: "Role Difficulty Adjustment", icon: Target, description: "Offensive burden and creation difficulty" },
-  { key: "sps", label: "SPS", fullName: "Scalability & Portability", icon: Zap, description: "How well value transfers across contexts" },
+  { key: "rda", label: "OIQ", fullName: "Offensive Impact Quotient", icon: Target, description: "Offensive burden and creation difficulty" },
+  { key: "sps", label: "PEM", fullName: "Playmaking Efficiency Metric", icon: Zap, description: "How well value transfers across contexts" },
   { key: "goi", label: "GOI", fullName: "Gravity & Off-Ball Impact", icon: BarChart3, description: "Value created without the ball" },
 ];
 
@@ -53,7 +53,7 @@ export function LeaderboardTabs({ players }: Props) {
   const scoreKey = `${activeTab}_score`;
 
   const filtered = useMemo(() => {
-    let result = [...players].filter((p) => p[scoreKey] != null);
+    let result = [...players].filter((p) => p[scoreKey] != null && Number(p[scoreKey]) !== 0);
     if (posFilter !== "All") {
       result = result.filter((p) => p.position === posFilter);
     }

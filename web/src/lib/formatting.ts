@@ -10,21 +10,22 @@ import type { ReactNode } from "react";
 
 /** Returns the CSS class for a metric score tier (uses globals.css stat-glow-* classes) */
 export function tierClass(score: number | null): string {
-  if (!score) return "text-text-muted";
+  if (score == null || score === 0) return "text-text-muted";
   if (score >= 80) return "stat-glow-elite";
   if (score >= 65) return "stat-glow-high";
   if (score >= 50) return "stat-glow-mid";
   return "stat-glow-low";
 }
 
-/** Returns the tier label text for a score */
+/** Returns the tier label text for a score (0-99 scale) */
 export function tierLabel(score: number | null): string {
-  if (!score) return "N/A";
+  if (score == null || score === 0) return "N/A";
   if (score >= 80) return "Elite";
   if (score >= 65) return "Great";
   if (score >= 50) return "Good";
   if (score >= 35) return "Average";
-  return "Below Avg";
+  if (score >= 20) return "Below Avg";
+  return "Poor";
 }
 
 /** Returns the metric-tier-N border class for cards */

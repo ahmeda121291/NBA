@@ -123,7 +123,7 @@ function parseQuery(query: string, players: Player[]): QueryResult | null {
   } else if (q.includes("efficient") || q.includes("efficien")) {
     metric = "sps";
     title = "Most Efficient Scorers";
-    description = "Ranked by Shot Profile Score (SPS) — measures shot selection quality and efficiency";
+    description = "Ranked by Playmaking Efficiency (PEM) — measures shot selection quality and efficiency";
     filtered = filtered.filter((p) => p.ppg >= 12);
     filtered.sort((a, b) => (b.sps ?? 0) - (a.sps ?? 0));
   } else if (q.includes("two-way") || q.includes("2-way") || q.includes("both ends") || q.includes("all-around")) {

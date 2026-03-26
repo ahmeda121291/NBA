@@ -364,6 +364,8 @@ export async function getPlayerWithMetrics(id: number) {
       pss.games_played, pss.games_started,
       pss.ppg, pss.rpg, pss.apg, pss.spg, pss.bpg, pss.topg, pss.mpg, pss.fpg,
       pss.fg_pct, pss.fg3_pct, pss.ft_pct,
+      pss.salary, pss.vfm,
+      (SELECT COUNT(*) + 1 FROM player_season_stats pss2 WHERE pss2.salary > pss.salary AND pss2.salary IS NOT NULL) AS salary_rank,
       pms.bis_score, pms.bis_confidence, pms.bis_percentile, pms.bis_components,
       pms.rda_score, pms.rda_confidence, pms.rda_label, pms.rda_components,
       pms.drs_score, pms.drs_confidence, pms.drs_label, pms.drs_components,

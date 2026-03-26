@@ -104,13 +104,6 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                 isActive ? "text-indigo-400" : "text-text-muted group-hover:text-text-secondary"
               )} />
               <span className="flex-1">{item.label}</span>
-
-              <span className={cn(
-                "text-[10px] font-mono transition-opacity hidden lg:inline",
-                isActive ? "text-indigo-400/40" : "text-text-muted/30 group-hover:text-text-muted/50"
-              )}>
-                {item.shortcut}
-              </span>
             </Link>
           );
         })}

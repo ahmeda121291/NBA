@@ -10,8 +10,8 @@ export const METRIC_LABELS: Record<string, { name: string; description: string; 
     description: "Stable estimate of overall player value using the strongest existing impact metrics.",
   },
   rda: {
-    name: "Role Difficulty Adjustment",
-    short: "RDA",
+    name: "Offensive Impact Quotient",
+    short: "OIQ",
     description: "Measures how hard a player's offensive role is — separating easy-efficiency from high-burden creation.",
   },
   goi: {
@@ -25,8 +25,8 @@ export const METRIC_LABELS: Record<string, { name: string; description: string; 
     description: "Estimates whether a player actually improves team defense, beyond steals and blocks.",
   },
   sps: {
-    name: "Scalability & Portability",
-    short: "SPS",
+    name: "Playmaking Efficiency Metric",
+    short: "PEM",
     description: "Measures whether player value transfers across different contexts, roles, and lineups.",
   },
   lfi: {

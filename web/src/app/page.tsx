@@ -57,14 +57,16 @@ export default async function DashboardPage() {
   const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   // Find the "best edge" game — highest confidence with >55% win prob
-  const bestEdge = games
+  const bestEdgeGames = games
     .filter((g: any) => g.win_prob_home && g.status !== "final")
-    .sort((a: any, b: any) => Math.abs(Number(b.win_prob_home) - 0.5) - Math.abs(Number(a.win_prob_home) - 0.5))[0];
+    .sort((a: any, b: any) => Math.abs(Number(b.win_prob_home) - 0.5) - Math.abs(Number(a.win_prob_home) - 0.5));
+  const bestEdge = bestEdgeGames.length > 0 ? bestEdgeGames[0] : null;
 
   // Find upset watch — scheduled game with closest to 50/50
-  const upsetWatch = games
+  const upsetWatchGames = games
     .filter((g: any) => g.win_prob_home && g.status !== "final" && g.upset_risk && (g.upset_risk === "toss-up" || g.upset_risk === "high"))
-    .sort((a: any, b: any) => Math.abs(Number(a.win_prob_home) - 0.5) - Math.abs(Number(b.win_prob_home) - 0.5))[0];
+    .sort((a: any, b: any) => Math.abs(Number(a.win_prob_home) - 0.5) - Math.abs(Number(b.win_prob_home) - 0.5));
+  const upsetWatch = upsetWatchGames.length > 0 ? upsetWatchGames[0] : null;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -333,13 +335,13 @@ export default async function DashboardPage() {
             <div className="section-header mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Flame className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">Hottest Players — Live Form Index</span>
+                <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">Hottest Players — Live Form Index <span className="text-[9px] text-text-muted/40 normal-case tracking-normal font-normal">(Last 10 games)</span></span>
               </div>
               <a href="/leaderboards" className="flex items-center gap-1 text-[10px] text-text-muted hover:text-indigo-400 transition-colors uppercase tracking-wider">
                 Leaderboards <ArrowRight className="h-3 w-3" />
               </a>
             </div>
-            <p className="text-[10px] text-text-muted/40 mb-3 -mt-1">Players performing most above their own season average — not overall best, but biggest recent surge</p>
+            <p className="text-[10px] text-text-muted/40 mb-3 -mt-1">Based on recent form vs season baseline — not overall best, but biggest recent surge</p>
             <GlassCard padding="none" hover={false}>
               {hot.map((p: any, i: number) => {
                 const lfi = p.lfi_score ? Number(p.lfi_score) : null;
@@ -392,7 +394,7 @@ export default async function DashboardPage() {
           <section>
             <div className="section-header mb-3 flex items-center gap-2.5">
               <Activity className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">Baseline Impact — Top 5</span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">Baseline Impact — Top 5 <span className="text-[9px] text-text-muted/40 normal-case tracking-normal font-normal">(Season)</span></span>
             </div>
             <GlassCard padding="none" hover={false}>
               <table className="w-full text-sm">
@@ -404,7 +406,7 @@ export default async function DashboardPage() {
                     <th className="px-4 py-2 text-right">Conf</th>
                     <th className="px-4 py-2 text-right">%ile</th>
                     <th className="px-4 py-2 text-right">DRS</th>
-                    <th className="px-4 py-2 text-right">RDA</th>
+                    <th className="px-4 py-2 text-right">OIQ</th>
                     <th className="px-4 py-2 text-right">PPG</th>
                   </tr>
                 </thead>

@@ -114,7 +114,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
       {/* Season Stats */}
       <GlassCard>
         <h2 className="section-header mb-4 text-[10px]">Season Stats</h2>
-        <div className="grid grid-cols-4 gap-4 sm:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
           <div className="text-center">
             <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Wins</p>
             <p className="font-stat text-xl font-bold mt-0.5 text-emerald-400">{wins}</p>

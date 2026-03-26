@@ -166,12 +166,12 @@ async function ingestPlayersAndStats(seasonId: number): Promise<void> {
 
     // Insert player
     const [playerRow] = await sql`
-      INSERT INTO players (external_id, first_name, last_name, full_name, headshot_url, is_active)
+      INSERT INTO players (external_id, first_name, last_name, full_name, headshot_url, is_active, position)
       VALUES (${extId}, ${first}, ${last}, ${fullName},
-        ${"https://cdn.nba.com/headshots/nba/latest/1040x760/" + extId + ".png"}, true)
+        ${"https://cdn.nba.com/headshots/nba/latest/1040x760/" + extId + ".png"}, true, ${row.PLAYER_POSITION || null})
       ON CONFLICT (external_id) DO UPDATE SET
         full_name = EXCLUDED.full_name, headshot_url = EXCLUDED.headshot_url,
-        is_active = true, updated_at = NOW()
+        is_active = true, position = COALESCE(EXCLUDED.position, players.position), updated_at = NOW()
       RETURNING id
     `;
     const playerId = playerRow.id;
@@ -587,7 +587,7 @@ async function ingestAdvancedPlayerStats(seasonId: number): Promise<void> {
           ast_pct = ${row.AST_PCT || null},
           reb_pct = ${row.REB_PCT || null},
           tov_pct = ${row.E_TOV_PCT || null},
-          per = ${row.PIE ? Math.round(Number(row.PIE) * 100 * 100) / 100 : null},
+          per = ${row.PIE ? Math.round(Number(row.PIE) * 100) / 100 : null},
           on_court_ortg = ${row.OFF_RATING || null},
           off_court_drtg = ${row.DEF_RATING || null},
           on_off_net = ${row.NET_RATING || null}

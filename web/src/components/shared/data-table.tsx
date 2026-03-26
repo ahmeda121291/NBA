@@ -227,8 +227,9 @@ export function DataTable<T>({
     const header = visCols.map((c) => c.label).join(",");
     const rows = sortedData.map((row) =>
       visCols.map((c) => {
-        const val = c.sortValue ? c.sortValue(row) : "";
-        return typeof val === "string" && val.includes(",") ? `"${val}"` : val ?? "";
+        const raw = c.sortValue ? c.sortValue(row) : "";
+        const val = raw == null || raw === "—" || (typeof raw === "number" && isNaN(raw)) ? "" : raw;
+        return typeof val === "string" && val.includes(",") ? `"${val}"` : val;
       }).join(",")
     );
     const csv = [header, ...rows].join("\n");
