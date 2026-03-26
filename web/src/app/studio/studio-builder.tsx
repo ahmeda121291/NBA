@@ -14,7 +14,7 @@ import { Download, Grid3X3, Trophy, BarChart3, TrendingUp, Zap, Users, Search, X
 
 interface PlayerData {
   id: number; name: string; team: string; conference: string; position: string;
-  gp: number; draftYear: number;
+  gp: number; draftYear: number; injuryStatus: string;
   ppg: number; rpg: number; apg: number; spg: number; bpg: number;
   mpg: number; topg: number;
   fg_pct: number; fg3_pct: number; ft_pct: number;
@@ -110,6 +110,8 @@ export function StudioBuilder({ players, teams }: Props) {
   const [minMpg, setMinMpg] = useState(0);
   const [expFilter, setExpFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("All");
+  const [excludeInjured, setExcludeInjured] = useState(false);
+  const [minGP, setMinGPStudio] = useState(0);
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [topN, setTopN] = useState(10);
@@ -169,6 +171,8 @@ export function StudioBuilder({ players, teams }: Props) {
       if (confFilter !== "All" && p.conference !== confFilter) return false;
       if (minMpg > 0 && p.mpg < minMpg) return false;
       if (teamFilter !== "All" && p.team !== teamFilter) return false;
+      if (excludeInjured && (p.injuryStatus === "Out" || p.injuryStatus === "out")) return false;
+      if (minGP > 0 && p.gp < minGP) return false;
       if (expFilter === "rookie" && p.draftYear !== 2025) return false;
       if (expFilter === "sophomore" && p.draftYear !== 2024) return false;
       if (expFilter === "young" && (p.draftYear < 2022 || p.draftYear === 0)) return false;
@@ -176,7 +180,7 @@ export function StudioBuilder({ players, teams }: Props) {
       if ((p.bis ?? 0) <= 0 && p.ppg <= 0) return false;
       return true;
     }).sort((a, b) => (b.bis ?? 0) - (a.bis ?? 0));
-  }, [players, posFilter, confFilter, minMpg, teamFilter, expFilter]);
+  }, [players, posFilter, confFilter, minMpg, teamFilter, expFilter, excludeInjured, minGP]);
 
   const filteredSearch = useMemo(() => {
     if (search.length < 2) return [];
@@ -189,12 +193,15 @@ export function StudioBuilder({ players, teams }: Props) {
       .slice(0, 12);
   }, [search, players, posFilter, confFilter, teamFilter, minMpg]);
 
-  const topNPlayers = useMemo(() =>
-    [...players].filter(p => getVal(p, metric) > 0)
-      .sort((a, b) => getVal(b, metric) - getVal(a, metric))
-      .slice(0, topN),
-    [players, metric, topN]
-  );
+  const topNPlayers = useMemo(() => {
+    let pool = [...players].filter(p => getVal(p, metric) > 0);
+    if (excludeInjured) pool = pool.filter(p => p.injuryStatus !== "Out" && p.injuryStatus !== "out");
+    if (minGP > 0) pool = pool.filter(p => p.gp >= minGP);
+    if (posFilter !== "All") pool = pool.filter(p => p.position?.includes(posFilter));
+    if (confFilter !== "All") pool = pool.filter(p => p.conference === confFilter);
+    if (teamFilter !== "All") pool = pool.filter(p => p.team === teamFilter);
+    return pool.sort((a, b) => getVal(b, metric) - getVal(a, metric)).slice(0, topN);
+  }, [players, metric, topN, excludeInjured, minGP, posFilter, confFilter, teamFilter]);
 
   const size = SOCIAL_SIZES.find(s => s.id === socialSize)!;
   const aspectRatio = `${size.w} / ${size.h}`;
@@ -402,20 +409,49 @@ export function StudioBuilder({ players, teams }: Props) {
                 </div>
               </div>
 
-              {/* Row 4: Team */}
-              <div>
-                <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Team</label>
-                <select
-                  value={teamFilter}
-                  onChange={(e) => setTeamFilter(e.target.value)}
-                  className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
-                >
-                  <option value="All">All Teams</option>
-                  {allTeamAbbrs.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+              {/* Row 4: Team + Min GP */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Team</label>
+                  <select
+                    value={teamFilter}
+                    onChange={(e) => setTeamFilter(e.target.value)}
+                    className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
+                  >
+                    <option value="All">All Teams</option>
+                    {allTeamAbbrs.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1">Min GP</label>
+                  <select
+                    value={minGP}
+                    onChange={(e) => setMinGPStudio(Number(e.target.value))}
+                    className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
+                  >
+                    <option value={0}>Any</option>
+                    <option value={20}>20+ GP</option>
+                    <option value={30}>30+ GP</option>
+                    <option value={40}>40+ GP</option>
+                    <option value={50}>50+ GP</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Row 5: Exclude Injured */}
+              <button
+                onClick={() => setExcludeInjured(!excludeInjured)}
+                className={`w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-semibold rounded border transition-all ${
+                  excludeInjured
+                    ? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+                    : "border-white/[0.08] text-text-muted/60 hover:border-white/[0.15]"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${excludeInjured ? "bg-rose-400" : "bg-text-muted/30"}`} />
+                {excludeInjured ? "Injured Players Excluded" : "Include Injured Players"}
+              </button>
             </div>
 
             {/* Search */}

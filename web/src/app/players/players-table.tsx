@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import { DataTable, Column, ViewPreset } from "@/components/shared/data-table";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
@@ -10,6 +11,16 @@ interface Props {
 }
 
 export function PlayersTable({ players }: Props) {
+  const [minGP, setMinGP] = useState(10);
+  const [excludeInjured, setExcludeInjured] = useState(false);
+
+  const filteredPlayers = useMemo(() => {
+    return players.filter((p: any) => {
+      if (Number(p.games_played) < minGP) return false;
+      if (excludeInjured && (p.injury_status === "Out" || p.injury_status === "out")) return false;
+      return true;
+    });
+  }, [players, minGP, excludeInjured]);
   const columns: Column<any>[] = [
     {
       key: "rank",
@@ -199,14 +210,53 @@ export function PlayersTable({ players }: Props) {
     },
   ];
 
+  const injuredCount = players.filter((p: any) => p.injury_status === "Out" || p.injury_status === "out").length;
+
   return (
-    <DataTable
-      data={players}
-      columns={columns}
-      filters={filters}
-      presets={presets}
-      defaultSort={{ key: "bis", direction: "desc" }}
-      csvFilename="courtvision-players"
-    />
+    <div>
+      {/* Advanced Filters Bar */}
+      <div className="flex items-center gap-4 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-text-muted/60 font-semibold uppercase tracking-wider">Min GP</label>
+          <select
+            value={minGP}
+            onChange={(e) => setMinGP(Number(e.target.value))}
+            className="bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
+          >
+            <option value={0}>All</option>
+            <option value={10}>10+ GP</option>
+            <option value={20}>20+ GP</option>
+            <option value={30}>30+ GP</option>
+            <option value={40}>40+ GP</option>
+            <option value={50}>50+ GP</option>
+          </select>
+        </div>
+
+        <button
+          onClick={() => setExcludeInjured(!excludeInjured)}
+          className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold rounded border transition-all ${
+            excludeInjured
+              ? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+              : "border-white/[0.08] text-text-muted/60 hover:border-white/[0.15]"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${excludeInjured ? "bg-rose-400" : "bg-text-muted/30"}`} />
+          Exclude Injured ({injuredCount})
+        </button>
+
+        <span className="text-[10px] text-text-muted/40 ml-auto">
+          Showing {filteredPlayers.length} of {players.length} players
+        </span>
+      </div>
+
+      <DataTable
+        data={filteredPlayers}
+        columns={columns}
+        filters={filters}
+        presets={presets}
+        defaultSort={{ key: "bis", direction: "desc" }}
+        csvFilename="courtvision-players"
+      />
+    </div>
   );
 }

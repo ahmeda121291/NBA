@@ -28,6 +28,7 @@ export default async function StudioPage() {
           position: String(p.position || ""),
           gp: Number(p.games_played || 0),
           draftYear: Number(p.draft_year || 0),
+          injuryStatus: String(p.injury_status || ""),
           ppg: Number(p.ppg || 0),
           rpg: Number(p.rpg || 0),
           apg: Number(p.apg || 0),

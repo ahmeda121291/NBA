@@ -756,11 +756,15 @@ export async function getAllPlayersWithFullStats(limit = 200) {
       pms.drs_score, pms.drs_label,
       pms.lfi_score, pms.lfi_confidence, pms.lfi_streak_label, pms.lfi_delta,
       pms.sps_score, pms.sps_label,
-      pms.goi_score
+      pms.goi_score,
+      t.conference AS team_conference,
+      pi.status AS injury_status,
+      pi.injury_type AS injury_type
     FROM players p
     JOIN player_season_stats pss ON p.id = pss.player_id
     JOIN teams t ON pss.team_id = t.id
     LEFT JOIN player_metric_snapshots pms ON pms.player_id = p.id
+    LEFT JOIN player_injuries pi ON pi.player_id = p.id AND pi.is_current = true
     WHERE pss.ppg IS NOT NULL AND pss.games_played > 10
     ORDER BY p.id, pms.bis_score DESC NULLS LAST
   `);
