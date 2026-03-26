@@ -492,7 +492,7 @@ async function main() {
   for (const pm of playerMetrics) {
     await sql`
       INSERT INTO player_metric_snapshots (
-        player_id, computed_at, as_of_date,
+        player_id, season_id, computed_at, as_of_date,
         bis_score, bis_confidence, bis_percentile, bis_components,
         rda_score, rda_confidence, rda_label, rda_components,
         drs_score, drs_confidence, drs_label, drs_components,
@@ -500,7 +500,7 @@ async function main() {
         sps_score, sps_confidence, sps_label, sps_components,
         goi_score, goi_confidence, goi_components
       ) VALUES (
-        ${pm.playerId}, NOW(), ${asOfDate},
+        ${pm.playerId}, ${seasonId}, NOW(), ${asOfDate},
         ${pm.bis}, ${pm.bisConfidence}, ${(pm as any).bisPercentile}, ${JSON.stringify(pm.bisComponents)},
         ${pm.rda}, ${pm.rdaConfidence}, ${pm.rdaLabel}, ${JSON.stringify(pm.rdaComponents)},
         ${pm.drs}, ${pm.drsConfidence}, ${pm.drsLabel}, ${JSON.stringify(pm.drsComponents)},
