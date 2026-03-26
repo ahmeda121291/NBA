@@ -336,7 +336,9 @@ async function main() {
 
       // 8. MINUTES + GP BONUS (8%) — sustained heavy-minute defenders
       const minutesRaw = clamp((mpg - 15) * 4, 0, 100);
-      const gpFactor = clamp(0.5 + (gp / 70) * 0.5, 0.5, 1.0);
+      // GP penalty: missing games HURTS. 70 GP = 1.0, 50 GP = 0.71, 35 GP = 0.50, 25 GP = 0.36
+      // Formula: (gp/70)^1.5 — exponential penalty for missing games
+      const gpFactor = clamp(Math.pow(gp / 70, 1.5), 0.25, 1.0);
       const minutesScore = minutesRaw * gpFactor;
 
       // 9. VERSATILITY (5%) — perimeter + interior actions both present
