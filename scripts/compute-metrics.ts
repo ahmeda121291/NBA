@@ -333,18 +333,23 @@ async function main() {
       // Charges drawn — everyone gets credit equally (rare for all positions)
       const chargeNorm = chargesDrawn > 0.1 ? clamp(50 + chargesDrawn * 30, 50, 90) : 50;
 
-      // WEIGHTS — balanced between rim protection and perimeter D
-      drs = clamp(
-        defRtgNorm * 0.30 +       // DEF_RATING vs position avg (king metric)
-        deflVsPos * 0.20 +         // Deflections vs position avg (wings shine)
-        stlPer36Norm * 0.15 +      // Steals per 36 (perimeter proxy)
-        contestVsPos * 0.10 +      // Contested shots vs position avg (reduced from 20%)
-        blkPer36Norm * 0.08 +      // Blocks per 36 vs position avg
+      // WEIGHTS — DEF_RATING is king. If your DEF_RATING is bad, hustle stats can't save you.
+      const rawDrs =
+        defRtgNorm * 0.45 +       // DEF_RATING vs position avg (THE metric)
+        deflVsPos * 0.15 +         // Deflections vs position avg
+        stlPer36Norm * 0.10 +      // Steals per 36 (perimeter proxy)
+        contestVsPos * 0.08 +      // Contested shots vs position avg
+        blkPer36Norm * 0.07 +      // Blocks per 36 vs position avg
         defWsNorm * 0.07 +         // Defensive win shares
-        looseBallNorm * 0.05 +     // Loose balls (hustle)
-        chargeNorm * 0.05,         // Charges drawn
-        0, 100
-      );
+        looseBallNorm * 0.04 +     // Loose balls (hustle)
+        chargeNorm * 0.04;         // Charges drawn
+
+      // CAP: if DEF_RATING is WORSE than position avg, cap DRS at 65 max
+      // You can't be "elite" if your team is worse when you're on court defending
+      const defRtgAboveAvg = defRating - posDefRtgAvg; // positive = worse than avg
+      const drsCap = defRtgAboveAvg > 0 ? Math.max(65 - defRtgAboveAvg * 3, 30) : 100;
+
+      drs = clamp(Math.min(rawDrs, drsCap), 0, 100);
     } else {
       // Fallback: box score only, position-relative, capped at 65
       const posStlAvg = posDefAvg.stl || 1;
