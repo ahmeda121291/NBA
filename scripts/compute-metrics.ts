@@ -480,6 +480,43 @@ async function main() {
     });
   }
 
+  // ---- Rescale ALL metrics to 0-99 (league leader = 99, worst = 0) ----
+  function rescaleMetric(key: "bis" | "drs" | "rda" | "sps" | "goi") {
+    const values = playerMetrics.map(p => p[key]).filter(v => v != null && !isNaN(v));
+    if (values.length === 0) return;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1; // avoid division by zero
+    for (const pm of playerMetrics) {
+      const raw = pm[key];
+      if (raw == null || isNaN(raw)) { pm[key] = 0; continue; }
+      pm[key] = Math.round(((raw - min) / range) * 99 * 100) / 100;
+    }
+  }
+
+  // LFI is special — it's relative to self, not others. Still rescale to 0-99.
+  function rescaleLfi() {
+    const values = playerMetrics.map(p => p.lfi).filter(v => v != null && !isNaN(v));
+    if (values.length === 0) return;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    for (const pm of playerMetrics) {
+      const raw = pm.lfi;
+      if (raw == null || isNaN(raw)) { pm.lfi = 50; continue; }
+      pm.lfi = Math.round(((raw - min) / range) * 99 * 100) / 100;
+    }
+  }
+
+  rescaleMetric("bis");
+  rescaleMetric("drs");
+  rescaleMetric("rda");   // OIQ stored as rda
+  rescaleMetric("sps");   // PEM stored as sps
+  rescaleMetric("goi");
+  rescaleLfi();
+
+  console.log("  ✓ All metrics rescaled to 0-99 (league leader = 99)");
+
   // ---- Percentile-based tier labels (same system for ALL metrics) ----
   // Sort descending for each metric, assign tier by rank position
   const total = playerMetrics.length;
@@ -684,7 +721,15 @@ async function main() {
     injuryImpact[ib.team_id] = { totalBis: num(ib.total_bis), count: num(ib.cnt) };
   }
 
-  let teamCount = 0;
+  // Collect all team metrics first, then rescale, then upsert
+  type TeamMetricRow = {
+    teamId: number; tsc: number; ltfi: number; lss: number; pts: number; rp: number; drsTeam: number;
+    w: number; l: number; winPctScore: number; weightedBIS: number; depthScore: number;
+    netRtg: number; drtg: number; drtgDiff: number; tGamesLen: number; sosAdj: number;
+    injImpact: { totalBis: number; count: number };
+  };
+  const teamMetrics: TeamMetricRow[] = [];
+
   for (const ts of teamStats) {
     const teamId = ts.team_id;
     const w = num(ts.wins); const l = num(ts.losses);
@@ -694,7 +739,6 @@ async function main() {
     const netRtg = num(ts.net_rating);
     const sos = num(ts.sos);
 
-    // ---- TSC v2: Win% + talent (BIS weighted by MPG) + depth ----
     const teamPlayers = bisScoresByTeam[teamId] || [];
     const weightedBIS = teamPlayers.length > 0
       ? teamPlayers.reduce((s, p) => s + p.bis * Math.min(p.mpg, 36), 0) / teamPlayers.reduce((s, p) => s + Math.min(p.mpg, 36), 0)
@@ -704,40 +748,62 @@ async function main() {
     const winPctScore = clamp(winPct * 100);
     const tsc = clamp(winPctScore * 0.35 + weightedBIS * 0.35 + depthScore * 0.30);
 
-    // ---- LTFI v2: SOS-adjusted recent form ----
     const tGames = (gamesByTeam[teamId] || []).slice(0, 10);
     let ltfi = 50;
     if (tGames.length >= 3) {
-      // Weight wins by opponent quality
       let weightedWins = 0, totalWeight = 0;
       for (const g of tGames) {
-        const oppStr = clamp((g.oppNetRtg + 10) / 20 * 100, 20, 100) / 100; // 0.2 to 1.0
-        const w = 0.5 + oppStr * 0.5; // beating good teams counts more
-        weightedWins += g.won ? w : 0;
-        totalWeight += w;
+        const oppStr = clamp((g.oppNetRtg + 10) / 20 * 100, 20, 100) / 100;
+        const wt = 0.5 + oppStr * 0.5;
+        weightedWins += g.won ? wt : 0;
+        totalWeight += wt;
       }
       const adjWinPct = totalWeight > 0 ? weightedWins / totalWeight : 0.5;
       const avgMargin = tGames.reduce((s, g) => s + g.margin, 0) / tGames.length;
       ltfi = clamp(adjWinPct * 60 + 20 + avgMargin * 0.4);
     }
 
-    // ---- LSS v2: Net Rating (not FG%) ----
     const netRtgDiff = netRtg - teamAvg.netRtg;
     const lss = clamp(50 + netRtgDiff * 4);
-
-    // ---- PTS: Forward-looking ----
     const sosAdj = num(ts.sos_remaining, sos) * 10;
     const pts = clamp(winPctScore * 0.55 + ltfi * 0.30 + (50 - sosAdj) * 0.15);
-
-    // ---- RP v2: BIS-weighted injury impact ----
     const injImpact = injuryImpact[teamId] || { totalBis: 0, count: 0 };
-    // Higher BIS players being out = worse penalty
-    const bisPenalty = injImpact.totalBis * 0.4; // ~40 BIS star out = 16 point penalty
+    const bisPenalty = injImpact.totalBis * 0.4;
     const rp = clamp(100 - bisPenalty);
-
-    // ---- DRS_Team: inverted DRTG ----
     const drtgDiff = teamAvg.drtg - drtg;
     const drsTeam = clamp(50 + drtgDiff * 5);
+
+    teamMetrics.push({
+      teamId, tsc, ltfi, lss, pts, rp, drsTeam,
+      w, l, winPctScore, weightedBIS, depthScore,
+      netRtg, drtg, drtgDiff, tGamesLen: tGames.length, sosAdj,
+      injImpact,
+    });
+  }
+
+  // ---- Rescale team metrics to 0-99 ----
+  function rescaleTeamMetric(key: "tsc" | "ltfi" | "lss" | "pts" | "drsTeam") {
+    const values = teamMetrics.map(t => t[key]);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    for (const tm of teamMetrics) {
+      tm[key] = Math.round(((tm[key] - min) / range) * 99 * 100) / 100;
+    }
+  }
+  // RP is inverted (100 = healthy, lower = more injuries) — don't rescale, it's already intuitive
+  rescaleTeamMetric("tsc");
+  rescaleTeamMetric("ltfi");
+  rescaleTeamMetric("lss");
+  rescaleTeamMetric("pts");
+  rescaleTeamMetric("drsTeam");
+  console.log("  ✓ Team metrics rescaled to 0-99");
+
+  // ---- Upsert team metrics ----
+  let teamCount = 0;
+  for (const tm of teamMetrics) {
+    const ts = teamStats.find(t => t.team_id === tm.teamId);
+    if (!ts) continue;
 
     await sql`
       INSERT INTO team_metric_snapshots (
@@ -749,20 +815,20 @@ async function main() {
         rp_score, rp_penalties,
         drs_team_score, drs_team_star_drop, drs_team_components
       ) VALUES (
-        ${teamId}, ${seasonId}, NOW(), ${asOfDate},
-        ${Math.round(tsc * 100) / 100}, ${clamp(Math.min((w + l) / 40, 1), 0, 1)},
-        ${JSON.stringify({ winPct: winPctScore, weightedBIS, depth: depthScore })},
-        ${Math.round(ltfi * 100) / 100},
-        ${JSON.stringify({ gamesUsed: tGames.length })},
-        ${JSON.stringify({ recentGames: tGames.length, sosAdjusted: true })},
-        ${Math.round(lss * 100) / 100}, ${clamp(Math.min((w + l) / 40, 1), 0, 1)},
-        ${JSON.stringify({ netRtg, leagueAvg: teamAvg.netRtg })},
-        ${Math.round(pts * 100) / 100}, ${clamp(Math.min((w + l) / 50, 1), 0, 1)},
-        ${JSON.stringify({ trajectory: winPctScore, ltfi, sosAdj })},
-        ${Math.round(rp * 100) / 100},
-        ${JSON.stringify({ injuredPlayers: injImpact.count, bisLost: injImpact.totalBis })},
-        ${Math.round(drsTeam * 100) / 100}, ${0},
-        ${JSON.stringify({ drtg, leagueAvg: teamAvg.drtg, diff: drtgDiff })}
+        ${tm.teamId}, ${seasonId}, NOW(), ${asOfDate},
+        ${Math.round(tm.tsc * 100) / 100}, ${clamp(Math.min((tm.w + tm.l) / 40, 1), 0, 1)},
+        ${JSON.stringify({ winPct: tm.winPctScore, weightedBIS: tm.weightedBIS, depth: tm.depthScore })},
+        ${Math.round(tm.ltfi * 100) / 100},
+        ${JSON.stringify({ gamesUsed: tm.tGamesLen })},
+        ${JSON.stringify({ recentGames: tm.tGamesLen, sosAdjusted: true })},
+        ${Math.round(tm.lss * 100) / 100}, ${clamp(Math.min((tm.w + tm.l) / 40, 1), 0, 1)},
+        ${JSON.stringify({ netRtg: tm.netRtg, leagueAvg: teamAvg.netRtg })},
+        ${Math.round(tm.pts * 100) / 100}, ${clamp(Math.min((tm.w + tm.l) / 50, 1), 0, 1)},
+        ${JSON.stringify({ trajectory: tm.winPctScore, ltfi: tm.ltfi, sosAdj: tm.sosAdj })},
+        ${Math.round(tm.rp * 100) / 100},
+        ${JSON.stringify({ injuredPlayers: tm.injImpact.count, bisLost: tm.injImpact.totalBis })},
+        ${Math.round(tm.drsTeam * 100) / 100}, ${0},
+        ${JSON.stringify({ drtg: tm.drtg, leagueAvg: teamAvg.drtg, diff: tm.drtgDiff })}
       )
       ON CONFLICT (team_id, season_id)
       DO UPDATE SET
