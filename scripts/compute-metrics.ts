@@ -238,31 +238,41 @@ async function main() {
     );
 
     // ==================================================================
-    // OIQ (Offensive Impact Quotient) — stored as rda_score in DB
-    // Position-relative usage + efficiency + creation
+    // OIQ v2 (Offensive Impact Quotient) — stored as rda_score in DB
+    // Fixed: no more triple TOV penalty, volume bonus for high-usage stars
     // ==================================================================
-    // Compare usage to position average (not league average)
-    const posUsgAvg = posAvgUsg[posGroup] || avg.usg_pct;
-    const usgVsPos = usgPct > 0 ? clamp(50 + ((usgPct - posUsgAvg) / (std.usg_pct || 0.05)) * 15, 0, 100) : 50;
 
-    // AST/TOV ratio (higher = better creation)
-    const astTov = topg > 0.5 ? apg / topg : apg > 0 ? apg * 2 : 0;
-    const astTovNorm = clamp(50 + (astTov - 1.5) * 12, 0, 100); // 1.5 is roughly average
+    // Raw TS% on wider scale (not compressed z-score) — every 1% matters
+    const rawTsAboveAvg = (tsPct - (avg.ts_pct || 0.56)) * 100; // e.g., +5 = 5% above avg
+    const tsOiqScore = clamp(50 + rawTsAboveAvg * 5, 10, 95); // wider spread than before
+
+    // Usage: higher usage = harder to be efficient. Give credit for volume.
+    const posUsgAvg = posAvgUsg[posGroup] || avg.usg_pct;
+    const usgAboveAvg = usgPct - posUsgAvg;
+    const usgVsPos = clamp(50 + usgAboveAvg * 200, 10, 95); // usage above position avg
+
+    // Volume bonus: scoring 25+ PPG on good TS% is elite
+    const volumeBonus = ppg >= 25 && tsPct > 0.57 ? 15 :
+                        ppg >= 20 && tsPct > 0.55 ? 10 :
+                        ppg >= 15 && tsPct > 0.54 ? 5 : 0;
+
+    // Assist rate (raw APG, NOT AST/TOV — don't penalize turnovers here)
+    const apgScore = clamp(50 + (apg - (avg.apg || 3)) * 5, 10, 90);
 
     // Free throw rate (FTA/FGA proxy for getting to the line)
     const ftRate = num(ps.fga) > 0 ? num(ps.fta) / num(ps.fga) : 0;
-    const ftRateNorm = clamp(50 + (ftRate - 0.25) * 80, 0, 100); // 0.25 is roughly avg
+    const ftRateNorm = clamp(50 + (ftRate - 0.25) * 80, 10, 90);
 
     const oiq = clamp(
-      usgVsPos * 0.25 +     // usage relative to position
-      tsNorm * 0.30 +        // true shooting efficiency
-      astTovNorm * 0.20 +    // creation quality
-      ppgNorm * 0.15 +       // volume scoring
-      ftRateNorm * 0.10      // ability to get to the line
+      tsOiqScore * 0.30 +     // true shooting (wider spread)
+      usgVsPos * 0.20 +       // usage relative to position
+      ppgNorm * 0.20 +         // volume scoring
+      apgScore * 0.15 +        // playmaking (raw assists, no TOV penalty)
+      ftRateNorm * 0.10 +      // getting to the line
+      volumeBonus * 0.05        // bonus for high-volume efficient scorers
     );
-    const oiqLabel = oiq >= 85 ? "Elite Scorer" : oiq >= 70 ? "High-Impact Offensive Player"
-      : oiq >= 55 ? "Solid Offensive Contributor" : oiq >= 40 ? "Average Offensive Player"
-      : "Limited Offensive Impact";
+    // Note: label will be overwritten by percentile-based tier system
+    const oiqLabel = "placeholder";
 
     // ==================================================================
     // DRS v2 — Real defensive data (already rebuilt)
@@ -386,18 +396,38 @@ async function main() {
     }
 
     // ==================================================================
-    // PEM (Playmaking Efficiency Metric) — stored as sps_score in DB
-    // TS% + AST/TOV ratio + low turnovers + creation
+    // PEM v2 (Playmaking Efficiency Metric) — stored as sps_score in DB
+    // Fixed: NO turnover penalty (already in BIS), raw APG is king,
+    // per-36 assists for bench players, TS% for shot creation quality
     // ==================================================================
-    const astNorm = normalize(astPct, avg.ast_pct || 0.1, std.ast_pct || 0.05);
+
+    // Raw APG on wider scale — Jokic at 10+ APG should dominate
+    const rawApgScore = clamp(50 + (apg - (avg.apg || 3)) * 8, 5, 99);
+
+    // Per-36 assist rate for fairer bench player comparison
+    const mpgSafe = Math.max(mpg, 10);
+    const per36Ast = (apg / mpgSafe) * 36;
+    const per36AstScore = clamp(50 + (per36Ast - 4.5) * 6, 5, 95);
+
+    // Assist percentage (% of teammate FGs assisted) — pure creation measure
+    const astPctScore = normalize(astPct, avg.ast_pct || 0.12, std.ast_pct || 0.06);
+
+    // TS% but only as "do they create good shots for themselves"
+    const tsPlaymaking = clamp(50 + rawTsAboveAvg * 3, 20, 80);
+
+    // Potential assists: APG relative to USG — high usage + high assists = elite
+    const creationLoad = usgPct > 0.15 ? apg / (usgPct * 100) : 0;
+    const creationScore = clamp(50 + (creationLoad - 0.15) * 200, 10, 90);
+
     const pem = clamp(
-      tsNorm * 0.30 +           // shooting efficiency
-      astTovNorm * 0.30 +       // creation quality (AST/TOV)
-      tovPenalty * 0.20 +       // low turnovers
-      astNorm * 0.20            // raw assist generation
+      rawApgScore * 0.30 +       // raw assists (biggest factor)
+      per36AstScore * 0.20 +     // per-36 assists (bench fairness)
+      astPctScore * 0.20 +       // assist rate (% of team FGs)
+      creationScore * 0.15 +     // creation under load (APG/USG%)
+      tsPlaymaking * 0.15        // shot creation quality
     );
-    const pemLabel = pem >= 80 ? "Elite Facilitator" : pem >= 65 ? "High-Level Playmaker"
-      : pem >= 50 ? "Capable Playmaker" : pem >= 35 ? "Limited Playmaker" : "Non-Creator";
+    // Note: label will be overwritten by percentile-based tier system
+    const pemLabel = "placeholder";
 
     // ==================================================================
     // GOI v2 — Clutch performance, filtered garbage time, 4Q scoring
@@ -458,7 +488,7 @@ async function main() {
       rda: Math.round(oiq * 100) / 100, // OIQ stored in rda column
       rdaConfidence: Math.round(bisConfidence * 100) / 100,
       rdaLabel: oiqLabel,
-      rdaComponents: { usgVsPos, ts: tsNorm, astTov: astTovNorm, ppg: ppgNorm, ftRate: ftRateNorm },
+      rdaComponents: { ts: tsOiqScore, usgVsPos, ppg: ppgNorm, apg: apgScore, ftRate: ftRateNorm, volumeBonus },
       drs: Math.round(drs * 100) / 100,
       drsConfidence: Math.round(drsConfidence * 100) / 100,
       drsLabel,
@@ -473,7 +503,7 @@ async function main() {
       sps: Math.round(pem * 100) / 100, // PEM stored in sps column
       spsConfidence: Math.round(bisConfidence * 100) / 100,
       spsLabel: pemLabel,
-      spsComponents: { ts: tsNorm, astTov: astTovNorm, tovInv: tovPenalty, ast: astNorm },
+      spsComponents: { rawApg: rawApgScore, per36Ast: per36AstScore, astPct: astPctScore, creation: creationScore, ts: tsPlaymaking },
       goi: Math.round(goi * 100) / 100,
       goiConfidence: Math.round(goiConfidence * 100) / 100,
       goiComponents: { pm: goiPlusMinusScore, clutch: goiClutchScore, closeGame: goiFourthQScore },

@@ -64,7 +64,8 @@
       "Bash(npx --prefix web tsx scripts/create-auth-tables.ts)",
       "Bash(npm init:*)",
       "Bash(npx tsx -e \":*)",
-      "Bash(curl -s \"https://nba-production-59c0.up.railway.app/teams\")"
+      "Bash(curl -s \"https://nba-production-59c0.up.railway.app/teams\")",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\({path:''web/.env.local''}\\); const p = require\\(''postgres''\\); const sql = p\\(process.env.DATABASE_URL, {max:1}\\); sql\\\\`SELECT 1 as ok\\\\`.then\\(r => { console.log\\(''DB OK:'', r[0].ok\\); sql.end\\(\\); }\\).catch\\(e => console.log\\(''DB fail:'', e.message\\)\\)\")"
     ]
   }
 }
