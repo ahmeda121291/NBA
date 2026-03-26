@@ -480,11 +480,92 @@ async function main() {
     });
   }
 
-  // ---- Compute percentiles ----
-  const bisSorted = [...playerMetrics].sort((a, b) => a.bis - b.bis);
+  // ---- Percentile-based tier labels (same system for ALL metrics) ----
+  // Sort descending for each metric, assign tier by rank position
+  const total = playerMetrics.length;
+
+  function assignTier(rank: number): string {
+    const pct = rank / total;
+    if (pct <= 0.05) return "Elite";        // Top 5%
+    if (pct <= 0.15) return "Great";        // Top 15%
+    if (pct <= 0.35) return "Good";         // Top 35%
+    if (pct <= 0.65) return "Average";      // Middle 30%
+    if (pct <= 0.85) return "Below Average"; // Bottom 35-15%
+    return "Poor";                           // Bottom 15%
+  }
+
+  // DRS-specific labels (same tiers, basketball-specific names)
+  function assignDrsTier(rank: number): string {
+    const pct = rank / total;
+    if (pct <= 0.05) return "Elite Defender";
+    if (pct <= 0.15) return "Plus Defender";
+    if (pct <= 0.35) return "Solid Defender";
+    if (pct <= 0.65) return "Average Defender";
+    if (pct <= 0.85) return "Below Avg Defender";
+    return "Weak Defender";
+  }
+
+  // OIQ-specific labels
+  function assignOiqTier(rank: number): string {
+    const pct = rank / total;
+    if (pct <= 0.05) return "Elite Offensive Force";
+    if (pct <= 0.15) return "High-Impact Scorer";
+    if (pct <= 0.35) return "Solid Offensive Player";
+    if (pct <= 0.65) return "Average Offensive Player";
+    if (pct <= 0.85) return "Limited Offensive Impact";
+    return "Minimal Offensive Value";
+  }
+
+  // PEM-specific labels
+  function assignPemTier(rank: number): string {
+    const pct = rank / total;
+    if (pct <= 0.05) return "Elite Facilitator";
+    if (pct <= 0.15) return "High-Level Playmaker";
+    if (pct <= 0.35) return "Capable Playmaker";
+    if (pct <= 0.65) return "Average Playmaker";
+    if (pct <= 0.85) return "Limited Playmaker";
+    return "Non-Creator";
+  }
+
+  // GOI-specific labels
+  function assignGoiTier(rank: number): string {
+    const pct = rank / total;
+    if (pct <= 0.05) return "Game Changer";
+    if (pct <= 0.15) return "Clutch Performer";
+    if (pct <= 0.35) return "Positive Influence";
+    if (pct <= 0.65) return "Neutral Impact";
+    if (pct <= 0.85) return "Negative Influence";
+    return "Liability";
+  }
+
+  // Sort each metric descending, assign rank + tier
+  const bisSorted = [...playerMetrics].sort((a, b) => b.bis - a.bis);
+  const drsSorted = [...playerMetrics].sort((a, b) => b.drs - a.drs);
+  const oiqSorted = [...playerMetrics].sort((a, b) => b.rda - a.rda);
+  const pemSorted = [...playerMetrics].sort((a, b) => b.sps - a.sps);
+  const goiSorted = [...playerMetrics].sort((a, b) => b.goi - a.goi);
+
+  // Build rank maps
+  const bisRank = new Map(bisSorted.map((p, i) => [p.playerId, i]));
+  const drsRank = new Map(drsSorted.map((p, i) => [p.playerId, i]));
+  const oiqRank = new Map(oiqSorted.map((p, i) => [p.playerId, i]));
+  const pemRank = new Map(pemSorted.map((p, i) => [p.playerId, i]));
+  const goiRank = new Map(goiSorted.map((p, i) => [p.playerId, i]));
+
+  // Apply tiers + percentiles
   for (const pm of playerMetrics) {
-    const rank = bisSorted.findIndex(b => b.playerId === pm.playerId);
-    (pm as any).bisPercentile = Math.round((rank / bisSorted.length) * 100);
+    const bRank = bisRank.get(pm.playerId) ?? total;
+    const dRank = drsRank.get(pm.playerId) ?? total;
+    const oRank = oiqRank.get(pm.playerId) ?? total;
+    const pRank = pemRank.get(pm.playerId) ?? total;
+    const gRank = goiRank.get(pm.playerId) ?? total;
+
+    (pm as any).bisPercentile = Math.round(((total - bRank) / total) * 100);
+    (pm as any).bisLabel = assignTier(bRank);
+    pm.drsLabel = assignDrsTier(dRank);
+    pm.rdaLabel = assignOiqTier(oRank);
+    pm.spsLabel = assignPemTier(pRank);
+    (pm as any).goiLabel = assignGoiTier(gRank);
   }
 
   // ---- Upsert to DB ----
