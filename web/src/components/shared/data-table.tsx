@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ChevronUp, ChevronDown, Columns, LayoutGrid, Download } from "lucide-react";
 import { MetricTooltip } from "./metric-tooltip";
@@ -13,7 +13,7 @@ export interface Column<T> {
   isMetric?: boolean;
   metricKey?: string;
   defaultVisible?: boolean;
-  width?: string;
+  width?: string; // CSS grid width: "200px", "1fr", "minmax(60px, 80px)"
   render: (row: T, index: number) => React.ReactNode;
   sortValue?: (row: T) => number | string | null;
 }
@@ -28,7 +28,7 @@ interface FilterOption {
 export interface ViewPreset {
   key: string;
   label: string;
-  columns: string[]; // column keys to show
+  columns: string[];
 }
 
 interface DataTableProps<T> {
@@ -38,7 +38,6 @@ interface DataTableProps<T> {
   defaultSort?: { key: string; direction: "asc" | "desc" };
   stickyFirstCol?: boolean;
   presets?: ViewPreset[];
-  /** Column keys used for CSV export label row */
   csvFilename?: string;
 }
 
@@ -47,7 +46,6 @@ export function DataTable<T>({
   columns,
   filters = [],
   defaultSort,
-  stickyFirstCol = false,
   presets = [],
   csvFilename = "export",
 }: DataTableProps<T>) {
@@ -55,7 +53,6 @@ export function DataTable<T>({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Read initial state from URL
   const [sortKey, setSortKey] = useState(() => searchParams.get("sort") || defaultSort?.key || "");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (searchParams.get("dir") as "asc" | "desc") || defaultSort?.direction || "desc");
   const [visibleCols, setVisibleCols] = useState<Set<string>>(() => {
@@ -77,7 +74,6 @@ export function DataTable<T>({
   });
   const [activePreset, setActivePreset] = useState<string | null>(() => searchParams.get("view"));
 
-  // Sync state to URL (shallow, no navigation)
   const updateUrl = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(updates)) {
@@ -163,13 +159,11 @@ export function DataTable<T>({
     return [...filteredData].sort((a, b) => {
       const va = col.sortValue!(a);
       const vb = col.sortValue!(b);
-      // Nulls/NaN always go to bottom regardless of sort direction
       const aNull = va == null || (typeof va === "number" && isNaN(va));
       const bNull = vb == null || (typeof vb === "number" && isNaN(vb));
       if (aNull && bNull) return 0;
       if (aNull) return 1;
       if (bNull) return -1;
-      // Force numeric comparison if both values look numeric
       const aNum = typeof va === "number" ? va : parseFloat(String(va));
       const bNum = typeof vb === "number" ? vb : parseFloat(String(vb));
       const cmp = (!isNaN(aNum) && !isNaN(bNum))
@@ -179,15 +173,16 @@ export function DataTable<T>({
     });
   }, [filteredData, sortKey, sortDir, columns]);
 
-  const visibleColumns = columns.filter((c) => visibleCols.has(c.key));
+  const visCols = columns.filter((c) => visibleCols.has(c.key));
+
+  // Build CSS grid template from column widths
+  const gridTemplate = visCols.map((col) => col.width || "1fr").join(" ");
 
   return (
     <div>
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        {/* Left: Filters + Presets */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Filters */}
           {filters.map((f) => (
             <div key={f.key} className="flex items-center gap-1">
               {["All", ...f.options].map((opt) => (
@@ -206,7 +201,6 @@ export function DataTable<T>({
             </div>
           ))}
 
-          {/* View Presets */}
           {presets.length > 0 && (
             <>
               {filters.length > 0 && <div className="w-px h-5 bg-white/[0.06]" />}
@@ -230,123 +224,119 @@ export function DataTable<T>({
           )}
         </div>
 
-        {/* Column picker + CSV */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={exportCSV}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted/60 hover:text-indigo-400 border border-white/[0.06] hover:border-[rgba(129,140,248,0.2)] transition-all rounded-sm"
-            title="Export visible data as CSV"
           >
             <Download className="h-3 w-3" />
             CSV
           </button>
           <div className="relative">
-          <button
-            onClick={() => setShowColPicker(!showColPicker)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted/60 hover:text-indigo-400 border border-white/[0.06] hover:border-[rgba(129,140,248,0.2)] transition-all rounded-sm"
-          >
-            <Columns className="h-3 w-3" />
-            Columns
-          </button>
-          {showColPicker && (
-            <>
-              <div className="fixed inset-0 z-30" onClick={() => setShowColPicker(false)} />
-              <div
-                className="absolute right-0 top-full mt-1 z-40 p-2 min-w-[200px] max-h-[300px] overflow-y-auto rounded-md"
-                style={{
-                  background: "linear-gradient(145deg, rgba(10, 18, 35, 0.98) 0%, rgba(4, 8, 18, 0.96) 100%)",
-                  border: "1px solid rgba(129, 140, 248, 0.15)",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(129,140,248,0.06)",
-                }}
-              >
-                {columns.map((col) => (
-                  <label
-                    key={col.key}
-                    className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-text-muted hover:text-text-primary cursor-pointer transition-colors rounded"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visibleCols.has(col.key)}
-                      onChange={() => toggleCol(col.key)}
-                      className="accent-indigo-400"
-                    />
-                    {col.isMetric ? (
-                      <span className="text-indigo-400/70">{col.label}</span>
-                    ) : (
-                      col.label
-                    )}
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="glass-card rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="text-sm" style={{ borderCollapse: "collapse", minWidth: "100%" }}>
-            <thead>
-              <tr className="border-b border-white/[0.06]">
-                {visibleColumns.map((col) => {
-                  const isNameCol = col.key === "name";
-                  const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
-                  const justifyCls = col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start";
-                  return (
-                    <th
+            <button
+              onClick={() => setShowColPicker(!showColPicker)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted/60 hover:text-indigo-400 border border-white/[0.06] hover:border-[rgba(129,140,248,0.2)] transition-all rounded-sm"
+            >
+              <Columns className="h-3 w-3" />
+              Columns
+            </button>
+            {showColPicker && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowColPicker(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 z-40 p-2 min-w-[200px] max-h-[300px] overflow-y-auto rounded-md"
+                  style={{
+                    background: "linear-gradient(145deg, rgba(10, 18, 35, 0.98) 0%, rgba(4, 8, 18, 0.96) 100%)",
+                    border: "1px solid rgba(129, 140, 248, 0.15)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  {columns.map((col) => (
+                    <label
                       key={col.key}
-                      style={isNameCol ? undefined : col.width ? { width: col.width } : { width: "70px" }}
-                      className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 whitespace-nowrap transition-colors ${alignCls} ${
-                        col.sortable ? "cursor-pointer select-none hover:text-indigo-400" : ""
-                      }`}
-                      onClick={() => col.sortable && handleSort(col.key)}
+                      className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-text-muted hover:text-text-primary cursor-pointer transition-colors rounded"
                     >
-                      {col.isMetric && col.metricKey ? (
-                        <MetricTooltip metricKey={col.metricKey}>
-                          <span className="text-indigo-400/80">{col.label}</span>
-                        </MetricTooltip>
+                      <input
+                        type="checkbox"
+                        checked={visibleCols.has(col.key)}
+                        onChange={() => toggleCol(col.key)}
+                        className="accent-indigo-400"
+                      />
+                      {col.isMetric ? (
+                        <span className="text-indigo-400/70">{col.label}</span>
                       ) : (
                         col.label
                       )}
-                      {col.sortable && sortKey === col.key && (
-                        sortDir === "desc"
-                          ? <ChevronDown className="h-3 w-3 text-indigo-400 inline ml-0.5" />
-                          : <ChevronUp className="h-3 w-3 text-indigo-400 inline ml-0.5" />
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedData.map((row, i) => (
-                <tr key={i} className="border-b border-white/[0.03] table-row-hover">
-                  {visibleColumns.map((col) => {
-                    const isNameCol = col.key === "name";
-                    const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
-                    return (
-                    <td
-                      key={col.key}
-                      style={isNameCol ? undefined : col.width ? { width: col.width } : { width: "70px" }}
-                      className={`px-3 py-2.5 whitespace-nowrap ${alignCls}`}
-                    >
-                        {col.render(row, i)}
-                    </td>
-                    );
-                  })}
-                </tr>
-              ))}
-              {sortedData.length === 0 && (
-                <tr>
-                  <td colSpan={visibleColumns.length} className="px-3 py-8 text-center text-text-muted">
-                    No data matches your filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Grid-based Table */}
+      <div className="glass-card rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          {/* Header row */}
+          <div
+            className="grid border-b border-white/[0.06]"
+            style={{ gridTemplateColumns: gridTemplate }}
+          >
+            {visCols.map((col) => {
+              const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
+              return (
+                <div
+                  key={col.key}
+                  className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 whitespace-nowrap ${alignCls} ${
+                    col.sortable ? "cursor-pointer select-none hover:text-indigo-400 transition-colors" : ""
+                  }`}
+                  onClick={() => col.sortable && handleSort(col.key)}
+                >
+                  {col.isMetric && col.metricKey ? (
+                    <MetricTooltip metricKey={col.metricKey}>
+                      <span className="text-indigo-400/80">{col.label}</span>
+                    </MetricTooltip>
+                  ) : (
+                    col.label
+                  )}
+                  {col.sortable && sortKey === col.key && (
+                    sortDir === "desc"
+                      ? <ChevronDown className="h-3 w-3 text-indigo-400 inline ml-0.5" />
+                      : <ChevronUp className="h-3 w-3 text-indigo-400 inline ml-0.5" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Data rows */}
+          {sortedData.map((row, i) => (
+            <div
+              key={i}
+              className="grid border-b border-white/[0.03] table-row-hover"
+              style={{ gridTemplateColumns: gridTemplate }}
+            >
+              {visCols.map((col) => {
+                const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
+                return (
+                  <div
+                    key={col.key}
+                    className={`px-3 py-2.5 text-sm whitespace-nowrap overflow-hidden text-ellipsis ${alignCls}`}
+                  >
+                    {col.render(row, i)}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+
+          {sortedData.length === 0 && (
+            <div className="px-3 py-8 text-center text-text-muted">
+              No data matches your filters.
+            </div>
+          )}
         </div>
       </div>
       <p className="text-[10px] text-text-muted/40 mt-2 font-stat text-right">

@@ -21,6 +21,7 @@ export function PlayersTable({ players }: Props) {
       key: "name",
       label: "Player",
       sortable: true,
+      width: "minmax(200px, 2fr)",
       sortValue: (r) => r.full_name,
       render: (r) => (
         <a href={`/players/${r.id}`} className="flex items-center gap-3 hover:text-indigo-400 transition-colors">
