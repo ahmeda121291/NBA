@@ -1,13 +1,23 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { toPng } from "html-to-image";
-import { Download, BarChart3, Grid3X3, Users, Trophy, Zap, TrendingUp } from "lucide-react";
+import {
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, ReferenceLine, Label
+} from "recharts";
+import { Download, Grid3X3, Trophy, BarChart3, TrendingUp, Zap, Users, Search, X, Twitter, Instagram, Monitor } from "lucide-react";
+
+// ============================================================
+// Types
+// ============================================================
 
 interface PlayerData {
   id: number; name: string; team: string; position: string;
-  ppg: number; rpg: number; apg: number;
+  ppg: number; rpg: number; apg: number; spg: number; bpg: number;
+  mpg: number; topg: number;
   fg_pct: number; fg3_pct: number; ft_pct: number;
+  ts_pct: number; usg_pct: number; per: number;
   bis: number | null; lfi: number | null; drs: number | null;
   sps: number | null; goi: number | null; rda: number | null;
 }
@@ -15,43 +25,51 @@ interface PlayerData {
 interface TeamData {
   id: number; name: string; abbr: string;
   wins: number; losses: number;
+  fg_pct: number; fg3_pct: number;
+  ortg: number; drtg: number; net_rating: number; pace: number;
   tsc: number | null; ltfi: number | null; elo: number | null;
 }
 
-interface Props {
-  players: PlayerData[];
-  teams: TeamData[];
-}
+interface Props { players: PlayerData[]; teams: TeamData[]; }
 
-type ChartType = "quadrant" | "tier-list" | "bar-compare" | "top10" | "matchup-card";
+type ChartType = "quadrant" | "tier-list" | "bar-compare" | "top10" | "matchup-card" | "stat-card";
+type SocialSize = "twitter" | "instagram" | "wide";
+
+const SOCIAL_SIZES: { id: SocialSize; label: string; icon: any; w: number; h: number }[] = [
+  { id: "twitter", label: "Twitter", icon: Twitter, w: 1200, h: 675 },
+  { id: "instagram", label: "Instagram", icon: Instagram, w: 1080, h: 1080 },
+  { id: "wide", label: "Widescreen", icon: Monitor, w: 1400, h: 600 },
+];
 
 const CHART_TEMPLATES: { id: ChartType; label: string; desc: string; icon: any }[] = [
-  { id: "quadrant", label: "4-Box Quadrant", desc: "Plot players on two axes — find the overrated & underrated", icon: Grid3X3 },
-  { id: "tier-list", label: "Tier List", desc: "Rank players into Elite / Great / Good / Average / Below tiers", icon: Trophy },
-  { id: "bar-compare", label: "Bar Comparison", desc: "Side-by-side stat bars for 2-5 players", icon: BarChart3 },
-  { id: "top10", label: "Top 10 List", desc: "Ranked list by any metric — clean & shareable", icon: TrendingUp },
-  { id: "matchup-card", label: "Matchup Card", desc: "Head-to-head preview card for two teams", icon: Zap },
+  { id: "quadrant", label: "Scatter Plot", desc: "Plot any two stats — find the overrated & underrated", icon: Grid3X3 },
+  { id: "top10", label: "Top 10 List", desc: "Ranked leaderboard by any metric", icon: TrendingUp },
+  { id: "bar-compare", label: "Bar Compare", desc: "Side-by-side bars for 2-8 players", icon: BarChart3 },
+  { id: "tier-list", label: "Tier List", desc: "Group players into Elite / Great / Good / Avg / Below", icon: Trophy },
+  { id: "stat-card", label: "Player Card", desc: "Single player stat card — perfect for Twitter", icon: Users },
+  { id: "matchup-card", label: "Matchup Card", desc: "Head-to-head team preview", icon: Zap },
 ];
 
 const METRICS = [
-  // CourtVision
   { key: "bis", label: "BIS (Impact)", group: "CourtVision" },
   { key: "lfi", label: "LFI (Form)", group: "CourtVision" },
   { key: "drs", label: "DRS (Defense)", group: "CourtVision" },
-  { key: "sps", label: "SPS (Shooting)", group: "CourtVision" },
-  { key: "goi", label: "GOI (Gravity)", group: "CourtVision" },
-  { key: "rda", label: "RDA (Role)", group: "CourtVision" },
-  // Traditional
+  { key: "rda", label: "OIQ (Offense)", group: "CourtVision" },
+  { key: "sps", label: "PEM (Playmaking)", group: "CourtVision" },
+  { key: "goi", label: "GOI (Clutch)", group: "CourtVision" },
   { key: "ppg", label: "PPG", group: "Traditional" },
   { key: "rpg", label: "RPG", group: "Traditional" },
   { key: "apg", label: "APG", group: "Traditional" },
   { key: "spg", label: "SPG", group: "Traditional" },
   { key: "bpg", label: "BPG", group: "Traditional" },
   { key: "mpg", label: "MPG", group: "Traditional" },
-  // Shooting
-  { key: "fg_pct", label: "FG%", group: "Shooting" },
-  { key: "fg3_pct", label: "3P%", group: "Shooting" },
-  { key: "ft_pct", label: "FT%", group: "Shooting" },
+  { key: "topg", label: "TOV", group: "Traditional" },
+  { key: "fg_pct", label: "FG%", group: "Efficiency", isPct: true },
+  { key: "fg3_pct", label: "3P%", group: "Efficiency", isPct: true },
+  { key: "ft_pct", label: "FT%", group: "Efficiency", isPct: true },
+  { key: "ts_pct", label: "TS%", group: "Efficiency", isPct: true },
+  { key: "usg_pct", label: "USG%", group: "Efficiency", isPct: true },
+  { key: "per", label: "PER", group: "Advanced" },
 ];
 
 function tierColor(score: number): string {
@@ -62,36 +80,62 @@ function tierColor(score: number): string {
   return "#f43f5e";
 }
 
-function tierLabel(score: number): string {
-  if (score >= 80) return "ELITE";
-  if (score >= 65) return "GREAT";
-  if (score >= 50) return "GOOD";
-  if (score >= 35) return "AVG";
-  return "BELOW";
-}
-
 function getVal(p: PlayerData, key: string): number {
   const v = (p as any)[key];
   return typeof v === "number" ? v : 0;
 }
 
+function fmtVal(val: number, key: string): string {
+  const m = METRICS.find(x => x.key === key);
+  if (m && (m as any).isPct) return (val * 100).toFixed(1) + "%";
+  if (val >= 100) return val.toFixed(0);
+  return val.toFixed(1);
+}
+
+// ============================================================
+// Main Component
+// ============================================================
+
 export function StudioBuilder({ players, teams }: Props) {
   const [chartType, setChartType] = useState<ChartType>("quadrant");
+  const [socialSize, setSocialSize] = useState<SocialSize>("twitter");
   const [selectedPlayers, setSelectedPlayers] = useState<PlayerData[]>([]);
-  const [selectedTeams, setSelectedTeams] = useState<TeamData[]>([]);
   const [xAxis, setXAxis] = useState("ppg");
   const [yAxis, setYAxis] = useState("bis");
   const [metric, setMetric] = useState("bis");
   const [search, setSearch] = useState("");
-  const [title, setTitle] = useState("My CourtVision Chart");
+  const [posFilter, setPosFilter] = useState("All");
+  const [title, setTitle] = useState("");
+  const [handle, setHandle] = useState("");
+  const [topN, setTopN] = useState(10);
+  const [selectedPlayerCard, setSelectedPlayerCard] = useState<PlayerData | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Auto-title based on template
+  const autoTitle = useMemo(() => {
+    const metricLabel = METRICS.find(m => m.key === metric)?.label || metric;
+    switch (chartType) {
+      case "quadrant": return `${METRICS.find(m => m.key === xAxis)?.label} vs ${METRICS.find(m => m.key === yAxis)?.label}`;
+      case "top10": return `Top ${topN} Players by ${metricLabel}`;
+      case "bar-compare": return `Player Comparison — ${metricLabel}`;
+      case "tier-list": return `${metricLabel} Tier List`;
+      case "stat-card": return selectedPlayerCard?.name || "Player Card";
+      case "matchup-card": return "Matchup Preview";
+      default: return "CourtVision Chart";
+    }
+  }, [chartType, metric, xAxis, yAxis, topN, selectedPlayerCard]);
+
+  const displayTitle = title || autoTitle;
 
   const handleDownload = useCallback(async () => {
     if (!chartRef.current) return;
     try {
+      const size = SOCIAL_SIZES.find(s => s.id === socialSize)!;
       const dataUrl = await toPng(chartRef.current, {
         backgroundColor: "#0a0e1a",
         pixelRatio: 2,
+        width: size.w,
+        height: size.h,
       });
       const link = document.createElement("a");
       link.download = `courtvision-${chartType}-${Date.now()}.png`;
@@ -100,225 +144,298 @@ export function StudioBuilder({ players, teams }: Props) {
     } catch (err) {
       console.error("Download failed:", err);
     }
-  }, [chartType]);
+  }, [chartType, socialSize]);
 
   const addPlayer = (p: PlayerData) => {
-    if (!selectedPlayers.find((sp) => sp.id === p.id)) {
+    if (!selectedPlayers.find(sp => sp.id === p.id)) {
       setSelectedPlayers([...selectedPlayers, p]);
     }
     setSearch("");
   };
 
-  const removePlayer = (id: number) => {
-    setSelectedPlayers(selectedPlayers.filter((p) => p.id !== id));
-  };
+  const filteredSearch = useMemo(() => {
+    if (search.length < 2) return [];
+    return players
+      .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+      .filter(p => posFilter === "All" || p.position?.includes(posFilter))
+      .slice(0, 12);
+  }, [search, players, posFilter]);
 
-  const filteredPlayers = search.length >= 2
-    ? players.filter((p) => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 10)
-    : [];
+  const topNPlayers = useMemo(() =>
+    [...players].filter(p => getVal(p, metric) > 0)
+      .sort((a, b) => getVal(b, metric) - getVal(a, metric))
+      .slice(0, topN),
+    [players, metric, topN]
+  );
 
-  // Auto-populate for top10
-  const top10Players = [...players]
-    .filter((p) => getVal(p, metric) > 0)
-    .sort((a, b) => getVal(b, metric) - getVal(a, metric))
-    .slice(0, 10);
+  const size = SOCIAL_SIZES.find(s => s.id === socialSize)!;
+  const aspectRatio = `${size.w} / ${size.h}`;
 
-  // Tier list grouping
-  const tierGroups = {
-    elite: players.filter((p) => getVal(p, metric) >= 80),
-    great: players.filter((p) => getVal(p, metric) >= 65 && getVal(p, metric) < 80),
-    good: players.filter((p) => getVal(p, metric) >= 50 && getVal(p, metric) < 65),
-    avg: players.filter((p) => getVal(p, metric) >= 35 && getVal(p, metric) < 50),
-    below: players.filter((p) => getVal(p, metric) > 0 && getVal(p, metric) < 35),
-  };
+  // Metric selector dropdown
+  const MetricSelect = ({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) => (
+    <div>
+      <label className="text-[10px] text-text-muted/60 mb-1 block font-semibold uppercase tracking-wider">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-[#141925] border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-indigo-500/50 transition-colors [&>optgroup]:bg-[#141925] [&>optgroup]:text-text-muted [&>option]:bg-[#141925] [&>option]:text-white"
+      >
+        {["CourtVision", "Traditional", "Efficiency", "Advanced"].map(group => (
+          <optgroup key={group} label={group}>
+            {METRICS.filter(m => m.group === group).map(m => (
+              <option key={m.key} value={m.key}>{m.label}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-      {/* LEFT: Controls */}
+    <div className="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-6">
+      {/* ════════ LEFT PANEL: Controls ════════ */}
       <div className="space-y-4">
+
         {/* Template Picker */}
-        <div className="glass-card p-4 space-y-3">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">Chart Template</h3>
-          <div className="space-y-2">
-            {CHART_TEMPLATES.map((t) => (
+        <div className="glass-card p-4">
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60 mb-3">Template</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {CHART_TEMPLATES.map(t => (
               <button
                 key={t.id}
                 onClick={() => setChartType(t.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                className={`text-left p-2.5 rounded-lg border transition-all ${
                   chartType === t.id
                     ? "border-indigo-500/40 bg-indigo-500/10"
                     : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <t.icon className={`h-4 w-4 ${chartType === t.id ? "text-indigo-400" : "text-text-muted/50"}`} />
-                  <span className="text-[12px] font-semibold">{t.label}</span>
+                <div className="flex items-center gap-1.5">
+                  <t.icon className={`h-3.5 w-3.5 ${chartType === t.id ? "text-indigo-400" : "text-text-muted/50"}`} />
+                  <span className="text-[11px] font-semibold">{t.label}</span>
                 </div>
-                <p className="text-[10px] text-text-muted/50 mt-1">{t.desc}</p>
+                <p className="text-[9px] text-text-muted/40 mt-0.5 line-clamp-1">{t.desc}</p>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Metric Selectors */}
+        {/* Social Size */}
+        <div className="glass-card p-4">
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60 mb-3">Export Size</h3>
+          <div className="flex gap-2">
+            {SOCIAL_SIZES.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setSocialSize(s.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-[10px] font-semibold transition-all ${
+                  socialSize === s.id
+                    ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-400"
+                    : "border-white/[0.06] text-text-muted/60 hover:border-white/[0.12]"
+                }`}
+              >
+                <s.icon className="h-3 w-3" />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Config */}
         <div className="glass-card p-4 space-y-3">
           <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">Configuration</h3>
 
           <div>
-            <label className="text-[10px] text-text-muted/50 mb-1 block">Chart Title</label>
+            <label className="text-[10px] text-text-muted/60 mb-1 block font-semibold uppercase tracking-wider">Title (auto-generates if empty)</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary focus:border-indigo-500/40 outline-none placeholder:text-text-muted/40"
+              placeholder={autoTitle}
+              className="w-full bg-[#141925] border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-indigo-500/50 placeholder:text-text-muted/30"
             />
           </div>
 
-          {(chartType === "quadrant") && (
+          <div>
+            <label className="text-[10px] text-text-muted/60 mb-1 block font-semibold uppercase tracking-wider">Your Handle (optional)</label>
+            <input
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              placeholder="@yourhandle"
+              className="w-full bg-[#141925] border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:border-indigo-500/50 placeholder:text-text-muted/30"
+            />
+          </div>
+
+          {chartType === "quadrant" && (
             <>
-              <div>
-                <label className="text-[10px] text-text-muted/50 mb-1 block">X Axis</label>
-                <select value={xAxis} onChange={(e) => setXAxis(e.target.value)} className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none [&>option]:bg-[#1a1f2e] [&>option]:text-white">
-                  {["CourtVision", "Traditional", "Shooting"].map((group) => (
-                    <optgroup key={group} label={group}>
-                      {METRICS.filter((m) => m.group === group).map((m) => (
-                        <option key={m.key} value={m.key}>{m.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] text-text-muted/50 mb-1 block">Y Axis</label>
-                <select value={yAxis} onChange={(e) => setYAxis(e.target.value)} className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none [&>option]:bg-[#1a1f2e] [&>option]:text-white">
-                  {["CourtVision", "Traditional", "Shooting"].map((group) => (
-                    <optgroup key={group} label={group}>
-                      {METRICS.filter((m) => m.group === group).map((m) => (
-                        <option key={m.key} value={m.key}>{m.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
+              <MetricSelect value={xAxis} onChange={setXAxis} label="X Axis" />
+              <MetricSelect value={yAxis} onChange={setYAxis} label="Y Axis" />
             </>
           )}
 
           {(chartType === "top10" || chartType === "tier-list" || chartType === "bar-compare") && (
+            <MetricSelect value={metric} onChange={setMetric} label="Metric" />
+          )}
+
+          {chartType === "top10" && (
             <div>
-              <label className="text-[10px] text-text-muted/50 mb-1 block">Metric</label>
-              <select value={metric} onChange={(e) => setMetric(e.target.value)} className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary outline-none [&>option]:bg-[#1a1f2e] [&>option]:text-white">
-                {["CourtVision", "Traditional", "Shooting"].map((group) => (
-                    <optgroup key={group} label={group}>
-                      {METRICS.filter((m) => m.group === group).map((m) => (
-                        <option key={m.key} value={m.key}>{m.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-              </select>
+              <label className="text-[10px] text-text-muted/60 mb-1 block font-semibold uppercase tracking-wider">Number of Players</label>
+              <div className="flex gap-1.5">
+                {[5, 10, 15, 20, 25].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setTopN(n)}
+                    className={`flex-1 py-1.5 rounded text-[11px] font-semibold border transition-all ${
+                      topN === n ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-400" : "border-white/[0.06] text-text-muted/60"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Player Picker (for quadrant / bar-compare) */}
-        {(chartType === "quadrant" || chartType === "bar-compare") && (
+        {/* Player Picker */}
+        {(chartType === "quadrant" || chartType === "bar-compare" || chartType === "stat-card") && (
           <div className="glass-card p-4 space-y-3">
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">
-              <Users className="h-3 w-3 inline mr-1" />
-              Players ({selectedPlayers.length})
+              {chartType === "stat-card" ? "Select Player" : `Players (${selectedPlayers.length})`}
             </h3>
+
+            {/* Position filter chips */}
+            <div className="flex gap-1">
+              {["All", "G", "F", "C"].map(pos => (
+                <button
+                  key={pos}
+                  onClick={() => setPosFilter(pos)}
+                  className={`px-2 py-0.5 text-[9px] font-bold rounded border transition-all ${
+                    posFilter === pos ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-400" : "border-white/[0.06] text-text-muted/50"
+                  }`}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+
             <div className="relative">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search players..."
-                className="w-full bg-[#1a1f2e] border border-white/[0.08] rounded px-3 py-1.5 text-sm text-text-primary focus:border-indigo-500/40 outline-none placeholder:text-text-muted/40"
-              />
-              {filteredPlayers.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1f2e] border border-white/[0.1] rounded-lg shadow-xl z-50 max-h-[200px] overflow-y-auto">
-                  {filteredPlayers.map((p) => (
-                    <button key={p.id} onClick={() => addPlayer(p)} className="w-full text-left px-3 py-2 hover:bg-white/[0.05] text-sm flex justify-between">
-                      <span>{p.name}</span>
-                      <span className="text-text-muted/40 text-[10px]">{p.team} · {p.position}</span>
+              <div className="flex items-center gap-1.5 bg-[#141925] border border-white/[0.1] rounded-lg px-3 py-2">
+                <Search className="h-3.5 w-3.5 text-text-muted/50" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search players..."
+                  className="bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted/30 w-full"
+                />
+              </div>
+              {filteredSearch.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[#141925] border border-white/[0.12] rounded-lg shadow-2xl z-50 max-h-[250px] overflow-y-auto">
+                  {filteredSearch.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => chartType === "stat-card" ? setSelectedPlayerCard(p) : addPlayer(p)}
+                      className="w-full text-left px-3 py-2 hover:bg-white/[0.06] transition-colors flex items-center justify-between"
+                    >
+                      <span className="text-sm text-text-primary">{p.name}</span>
+                      <span className="text-[10px] text-text-muted/50">{p.team} · {p.position} · BIS {p.bis?.toFixed(0) || "—"}</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {selectedPlayers.map((p) => (
-                <span key={p.id} className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded px-2 py-0.5 flex items-center gap-1">
-                  {p.name}
-                  <button onClick={() => removePlayer(p.id)} className="hover:text-rose-400">×</button>
-                </span>
-              ))}
-            </div>
-            {chartType === "quadrant" && selectedPlayers.length === 0 && (
-              <button
-                onClick={() => setSelectedPlayers(players.filter((p) => (p.bis ?? 0) > 0).slice(0, 50))}
-                className="text-[10px] text-indigo-400 hover:text-indigo-300"
-              >
-                Auto-fill top 50 by BIS
-              </button>
+
+            {chartType !== "stat-card" && (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedPlayers.map(p => (
+                    <span key={p.id} className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full px-2.5 py-0.5 flex items-center gap-1">
+                      {p.name.split(" ").pop()} <span className="text-text-muted/50">{p.team}</span>
+                      <button onClick={() => setSelectedPlayers(selectedPlayers.filter(x => x.id !== p.id))} className="hover:text-rose-400 ml-0.5">×</button>
+                    </span>
+                  ))}
+                </div>
+                {chartType === "quadrant" && selectedPlayers.length === 0 && (
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedPlayers(players.filter(p => (p.bis ?? 0) > 0).slice(0, 50))} className="text-[10px] text-indigo-400 hover:underline">
+                      Top 50 by BIS
+                    </button>
+                    <button onClick={() => setSelectedPlayers(players.filter(p => p.ppg >= 15))} className="text-[10px] text-indigo-400 hover:underline">
+                      All 15+ PPG
+                    </button>
+                    <button onClick={() => setSelectedPlayers(players.filter(p => p.mpg >= 25).slice(0, 60))} className="text-[10px] text-indigo-400 hover:underline">
+                      Starters (25+ MPG)
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
-        {/* Download Button */}
+        {/* Download */}
         <button
           onClick={handleDownload}
-          className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20"
         >
           <Download className="h-4 w-4" />
-          Download PNG
+          Download PNG ({size.w}×{size.h})
         </button>
       </div>
 
-      {/* RIGHT: Chart Preview */}
+      {/* ════════ RIGHT PANEL: Preview ════════ */}
       <div>
-        <div ref={chartRef} className="bg-[#0a0e1a] rounded-xl p-6 border border-white/[0.06] min-h-[500px] relative">
-          {/* Title */}
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-white">{title}</h2>
-            <p className="text-[11px] text-text-muted/70 mt-1">
-              {METRICS.find((m) => m.key === (chartType === "quadrant" ? xAxis : metric))?.label}
-              {chartType === "quadrant" && ` vs ${METRICS.find((m) => m.key === yAxis)?.label}`}
-              {" · "}2025-26 Season
-            </p>
-          </div>
-
-          {/* QUADRANT CHART */}
-          {chartType === "quadrant" && (
-            <QuadrantChart
-              players={selectedPlayers.length > 0 ? selectedPlayers : players.filter((p) => (p.bis ?? 0) > 0).slice(0, 40)}
-              xKey={xAxis} yKey={yAxis}
-            />
-          )}
-
-          {/* TOP 10 LIST */}
-          {chartType === "top10" && (
-            <Top10List players={top10Players} metric={metric} metricLabel={METRICS.find((m) => m.key === metric)?.label || metric} />
-          )}
-
-          {/* TIER LIST */}
-          {chartType === "tier-list" && (
-            <TierList groups={tierGroups} metric={metric} metricLabel={METRICS.find((m) => m.key === metric)?.label || metric} />
-          )}
-
-          {/* BAR COMPARE */}
-          {chartType === "bar-compare" && (
-            <BarCompare players={selectedPlayers} metric={metric} metricLabel={METRICS.find((m) => m.key === metric)?.label || metric} />
-          )}
-
-          {/* MATCHUP CARD */}
-          {chartType === "matchup-card" && teams.length >= 2 && (
-            <MatchupCard teams={teams} />
-          )}
-
-          {/* Watermark */}
-          <div className="absolute bottom-3 right-4 flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded-full bg-indigo-500/30 flex items-center justify-center">
-              <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+        <div
+          ref={chartRef}
+          className="bg-[#0a0e1a] rounded-xl border border-white/[0.06] relative overflow-hidden"
+          style={{ aspectRatio, maxHeight: "700px" }}
+        >
+          {/* Inner padding container */}
+          <div className="p-6 h-full flex flex-col">
+            {/* Header */}
+            <div className="mb-4 shrink-0">
+              <h2 className="text-xl font-bold text-white leading-tight">{displayTitle}</h2>
+              <p className="text-[11px] text-gray-500 mt-1">
+                2025-26 Season · courtvisionai.io
+              </p>
             </div>
-            <span className="text-[9px] text-text-muted/50 font-semibold tracking-wider">courtvisionai.io</span>
+
+            {/* Chart body */}
+            <div className="flex-1 min-h-0">
+              {chartType === "quadrant" && (
+                <QuadrantChart
+                  players={selectedPlayers.length > 0 ? selectedPlayers : players.filter(p => (p.bis ?? 0) > 0).slice(0, 40)}
+                  xKey={xAxis} yKey={yAxis}
+                />
+              )}
+              {chartType === "top10" && (
+                <Top10List players={topNPlayers} metric={metric} />
+              )}
+              {chartType === "tier-list" && (
+                <TierList players={players} metric={metric} />
+              )}
+              {chartType === "bar-compare" && (
+                <BarCompare players={selectedPlayers} metric={metric} />
+              )}
+              {chartType === "stat-card" && (
+                <StatCard player={selectedPlayerCard} />
+              )}
+              {chartType === "matchup-card" && (
+                <MatchupCard teams={teams} />
+              )}
+            </div>
+
+            {/* Watermark */}
+            <div className="flex items-center justify-between mt-3 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <div className="h-3 w-3 rounded-full bg-indigo-500/30 flex items-center justify-center">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                </div>
+                <span className="text-[9px] text-gray-600 font-semibold tracking-wider">courtvisionai.io</span>
+              </div>
+              {handle && (
+                <span className="text-[9px] text-gray-600 font-semibold">{handle}</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -331,90 +448,92 @@ export function StudioBuilder({ players, teams }: Props) {
 // ============================================================
 
 function QuadrantChart({ players, xKey, yKey }: { players: PlayerData[]; xKey: string; yKey: string }) {
-  const xVals = players.map((p) => getVal(p, xKey)).filter((v) => v > 0);
-  const yVals = players.map((p) => getVal(p, yKey)).filter((v) => v > 0);
-  if (xVals.length === 0 || yVals.length === 0) return <p className="text-text-muted/70 text-sm">No data available</p>;
+  const data = players.map(p => ({
+    name: p.name.split(" ").pop(),
+    fullName: p.name,
+    team: p.team,
+    x: getVal(p, xKey),
+    y: getVal(p, yKey),
+    bis: p.bis ?? 50,
+  })).filter(d => d.x > 0 && d.y > 0);
 
-  const xMin = Math.min(...xVals) * 0.9;
-  const xMax = Math.max(...xVals) * 1.05;
-  const yMin = Math.min(...yVals) * 0.9;
-  const yMax = Math.max(...yVals) * 1.05;
-  const xMid = (xMin + xMax) / 2;
-  const yMid = (yMin + yMax) / 2;
+  if (data.length === 0) return <p className="text-gray-500 text-sm text-center py-12">Add players or auto-fill from the left panel</p>;
 
-  const w = 700, h = 420;
-  const pad = { top: 20, right: 20, bottom: 40, left: 50 };
-
-  const toX = (v: number) => pad.left + ((v - xMin) / (xMax - xMin)) * (w - pad.left - pad.right);
-  const toY = (v: number) => pad.top + (1 - (v - yMin) / (yMax - yMin)) * (h - pad.top - pad.bottom);
+  const xAvg = data.reduce((s, d) => s + d.x, 0) / data.length;
+  const yAvg = data.reduce((s, d) => s + d.y, 0) / data.length;
+  const xLabel = METRICS.find(m => m.key === xKey)?.label || xKey;
+  const yLabel = METRICS.find(m => m.key === yKey)?.label || yKey;
 
   return (
-    <div className="w-full overflow-x-auto">
-      <svg width={w} height={h} className="mx-auto">
-        {/* Quadrant lines */}
-        <line x1={toX(xMid)} y1={pad.top} x2={toX(xMid)} y2={h - pad.bottom} stroke="rgba(255,255,255,0.12)" strokeDasharray="4,4" />
-        <line x1={pad.left} y1={toY(yMid)} x2={w - pad.right} y2={toY(yMid)} stroke="rgba(255,255,255,0.12)" strokeDasharray="4,4" />
-
-        {/* Quadrant labels */}
-        <text x={toX(xMin) + 10} y={toY(yMax) + 15} fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold">UNDERRATED</text>
-        <text x={toX(xMax) - 80} y={toY(yMax) + 15} fill="rgba(129,140,248,0.25)" fontSize="10" fontWeight="bold">ELITE</text>
-        <text x={toX(xMin) + 10} y={toY(yMin) - 5} fill="rgba(244,63,94,0.2)" fontSize="10" fontWeight="bold">LOW IMPACT</text>
-        <text x={toX(xMax) - 80} y={toY(yMin) - 5} fill="rgba(255,255,255,0.35)" fontSize="10" fontWeight="bold">OVERRATED</text>
-
-        {/* Points */}
-        {players.map((p) => {
-          const x = getVal(p, xKey);
-          const y = getVal(p, yKey);
-          if (x <= 0 || y <= 0) return null;
-          const cx = toX(x);
-          const cy = toY(y);
-          const bis = p.bis ?? 50;
-          return (
-            <g key={p.id}>
-              <circle cx={cx} cy={cy} r={4} fill={tierColor(bis)} opacity={0.85} />
-              <text x={cx + 6} y={cy + 3} fill="rgba(255,255,255,0.85)" fontSize="8" fontFamily="monospace">
-                {p.name.split(" ").pop()}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Axis labels */}
-        <text x={w / 2} y={h - 5} fill="rgba(255,255,255,0.5)" fontSize="10" textAnchor="middle">
-          {METRICS.find((m) => m.key === xKey)?.label} →
-        </text>
-        <text x={12} y={h / 2} fill="rgba(255,255,255,0.5)" fontSize="10" textAnchor="middle" transform={`rotate(-90, 12, ${h / 2})`}>
-          {METRICS.find((m) => m.key === yKey)?.label} →
-        </text>
-      </svg>
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <ScatterChart margin={{ top: 10, right: 30, bottom: 30, left: 10 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+        <XAxis
+          type="number" dataKey="x" name={xLabel}
+          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }}
+          axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+        >
+          <Label value={xLabel} position="bottom" offset={10} style={{ fill: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 }} />
+        </XAxis>
+        <YAxis
+          type="number" dataKey="y" name={yLabel}
+          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }}
+          axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+        >
+          <Label value={yLabel} angle={-90} position="insideLeft" offset={5} style={{ fill: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 }} />
+        </YAxis>
+        <ReferenceLine x={xAvg} stroke="rgba(129,140,248,0.3)" strokeDasharray="4 4" />
+        <ReferenceLine y={yAvg} stroke="rgba(129,140,248,0.3)" strokeDasharray="4 4" />
+        <Tooltip
+          content={({ payload }) => {
+            if (!payload?.[0]) return null;
+            const d = payload[0].payload;
+            return (
+              <div className="bg-[#1a1f2e] border border-white/[0.15] rounded-lg px-3 py-2 shadow-xl">
+                <p className="text-sm font-bold text-white">{d.fullName}</p>
+                <p className="text-[10px] text-gray-400">{d.team} · BIS {d.bis.toFixed(0)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{xLabel}: {fmtVal(d.x, xKey)} · {yLabel}: {fmtVal(d.y, yKey)}</p>
+              </div>
+            );
+          }}
+        />
+        <Scatter data={data} fill="#818cf8">
+          {data.map((d, i) => (
+            <Cell key={i} fill={tierColor(d.bis)} opacity={0.85} />
+          ))}
+        </Scatter>
+      </ScatterChart>
+    </ResponsiveContainer>
   );
 }
 
-function Top10List({ players, metric, metricLabel }: { players: PlayerData[]; metric: string; metricLabel: string }) {
+function Top10List({ players, metric }: { players: PlayerData[]; metric: string }) {
+  const metricLabel = METRICS.find(m => m.key === metric)?.label || metric;
+  const maxVal = getVal(players[0], metric) || 1;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5 overflow-y-auto h-full">
       {players.map((p, i) => {
         const val = getVal(p, metric);
-        const maxVal = getVal(players[0], metric) || 1;
         const pct = (val / maxVal) * 100;
+        const isGold = i === 0, isSilver = i === 1, isBronze = i === 2;
         return (
           <div key={p.id} className="flex items-center gap-3">
-            <span className={`w-7 text-right font-bold text-lg ${i === 0 ? "text-amber-400" : i === 1 ? "text-text-muted/80" : i === 2 ? "text-amber-600" : "text-text-muted/50"}`}>
+            <span className={`w-7 text-right font-bold text-lg tabular-nums ${isGold ? "text-amber-400" : isSilver ? "text-gray-300" : isBronze ? "text-amber-600" : "text-gray-600"}`}>
               {i + 1}
             </span>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-0.5">
-                <div>
-                  <span className="text-sm font-semibold text-white">{p.name}</span>
-                  <span className="text-[10px] text-text-muted/70 ml-2">{p.team}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-semibold text-white truncate">{p.name}</span>
+                  <span className="text-[10px] text-gray-500 shrink-0">{p.team}</span>
                 </div>
-                <span className="font-mono text-sm font-bold" style={{ color: tierColor(val) }}>
-                  {metric.includes("pct") ? (val * 100).toFixed(1) + "%" : val.toFixed(1)}
+                <span className="font-mono text-sm font-bold shrink-0 ml-2" style={{ color: tierColor(val) }}>
+                  {fmtVal(val, metric)}
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-white/[0.04] overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: tierColor(val) }} />
+              <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: tierColor(val) + "80" }} />
               </div>
             </div>
           </div>
@@ -424,35 +543,37 @@ function Top10List({ players, metric, metricLabel }: { players: PlayerData[]; me
   );
 }
 
-function TierList({ groups, metric, metricLabel }: {
-  groups: Record<string, PlayerData[]>; metric: string; metricLabel: string;
-}) {
+function TierList({ players, metric }: { players: PlayerData[]; metric: string }) {
   const tiers = [
-    { key: "elite", label: "ELITE", color: "#818cf8", bg: "rgba(129,140,248,0.08)", border: "rgba(129,140,248,0.2)" },
-    { key: "great", label: "GREAT", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)" },
-    { key: "good", label: "GOOD", color: "#fbbf24", bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.2)" },
-    { key: "avg", label: "AVERAGE", color: "#f97316", bg: "rgba(249,115,22,0.08)", border: "rgba(249,115,22,0.2)" },
-    { key: "below", label: "BELOW", color: "#f43f5e", bg: "rgba(244,63,94,0.08)", border: "rgba(244,63,94,0.2)" },
+    { label: "ELITE", min: 80, color: "#818cf8", bg: "rgba(129,140,248,0.06)", border: "rgba(129,140,248,0.15)" },
+    { label: "GREAT", min: 65, color: "#34d399", bg: "rgba(52,211,153,0.06)", border: "rgba(52,211,153,0.15)" },
+    { label: "GOOD", min: 50, color: "#fbbf24", bg: "rgba(251,191,36,0.06)", border: "rgba(251,191,36,0.15)" },
+    { label: "AVG", min: 35, color: "#f97316", bg: "rgba(249,115,22,0.06)", border: "rgba(249,115,22,0.15)" },
+    { label: "BELOW", min: 0, color: "#f43f5e", bg: "rgba(244,63,94,0.06)", border: "rgba(244,63,94,0.15)" },
   ];
 
   return (
-    <div className="space-y-3">
-      {tiers.map((t) => {
-        const items = (groups as any)[t.key] || [];
+    <div className="space-y-2 overflow-y-auto h-full">
+      {tiers.map(t => {
+        const items = players.filter(p => {
+          const v = getVal(p, metric);
+          const nextTier = tiers.find(x => x.min > t.min && x.min <= v);
+          return v >= t.min && (t.min === 80 ? v >= 80 : !tiers.find(x => x.min > t.min && v >= x.min));
+        }).sort((a, b) => getVal(b, metric) - getVal(a, metric));
         if (items.length === 0) return null;
         return (
-          <div key={t.key} className="rounded-lg p-3" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
+          <div key={t.label} className="rounded-lg p-3" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: t.color }}>{t.label}</span>
-              <span className="text-[9px] text-text-muted/70">({items.length} players)</span>
+              <span className="text-[9px] text-gray-600">{items.length} players</span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {items.slice(0, 12).map((p: PlayerData) => (
-                <span key={p.id} className="text-[10px] px-2 py-0.5 rounded bg-black/20 text-text-secondary font-mono">
+            <div className="flex flex-wrap gap-1">
+              {items.slice(0, 15).map(p => (
+                <span key={p.id} className="text-[10px] px-2 py-0.5 rounded bg-black/30 text-gray-300 font-mono">
                   {p.name.split(" ").slice(-1)[0]} <span style={{ color: t.color }}>{getVal(p, metric).toFixed(0)}</span>
                 </span>
               ))}
-              {items.length > 12 && <span className="text-[10px] text-text-muted/50">+{items.length - 12} more</span>}
+              {items.length > 15 && <span className="text-[9px] text-gray-600">+{items.length - 15}</span>}
             </div>
           </div>
         );
@@ -461,59 +582,144 @@ function TierList({ groups, metric, metricLabel }: {
   );
 }
 
-function BarCompare({ players, metric, metricLabel }: { players: PlayerData[]; metric: string; metricLabel: string }) {
-  if (players.length === 0) return <p className="text-text-muted/70 text-sm text-center py-12">Add 2-5 players from the left panel to compare</p>;
-  const maxVal = Math.max(...players.map((p) => getVal(p, metric)), 1);
+function BarCompare({ players, metric }: { players: PlayerData[]; metric: string }) {
+  if (players.length === 0) return <p className="text-gray-500 text-sm text-center py-12">Add 2-8 players from the left panel</p>;
+
+  const data = players.map(p => ({
+    name: p.name.split(" ").pop(),
+    fullName: p.name,
+    team: p.team,
+    value: getVal(p, metric),
+  }));
 
   return (
-    <div className="space-y-4">
-      {players.map((p) => {
-        const val = getVal(p, metric);
-        const pct = (val / maxVal) * 100;
-        return (
-          <div key={p.id} className="flex items-center gap-4">
-            <div className="w-32 text-right">
-              <p className="text-sm font-semibold text-white truncate">{p.name}</p>
-              <p className="text-[10px] text-text-muted/70">{p.team} · {p.position}</p>
-            </div>
-            <div className="flex-1">
-              <div className="h-8 rounded bg-white/[0.04] overflow-hidden relative">
-                <div className="h-full rounded transition-all flex items-center px-3" style={{ width: `${pct}%`, backgroundColor: tierColor(val) + "40" }}>
-                  <span className="font-mono text-sm font-bold text-white">
-                    {metric.includes("pct") ? (val * 100).toFixed(1) + "%" : val.toFixed(1)}
-                  </span>
-                </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 40, bottom: 5, left: 80 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" horizontal={false} />
+        <XAxis type="number" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} />
+        <YAxis type="category" dataKey="name" tick={{ fill: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 600 }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} width={75} />
+        <Tooltip
+          content={({ payload }) => {
+            if (!payload?.[0]) return null;
+            const d = payload[0].payload;
+            return (
+              <div className="bg-[#1a1f2e] border border-white/[0.15] rounded-lg px-3 py-2 shadow-xl">
+                <p className="text-sm font-bold text-white">{d.fullName}</p>
+                <p className="text-[10px] text-gray-400">{d.team} · {fmtVal(d.value, metric)}</p>
               </div>
-            </div>
+            );
+          }}
+        />
+        <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={tierColor(d.value)} opacity={0.75} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function StatCard({ player }: { player: PlayerData | null }) {
+  if (!player) return <p className="text-gray-500 text-sm text-center py-12">Search and select a player from the left panel</p>;
+
+  const stats = [
+    { label: "PPG", value: player.ppg.toFixed(1) },
+    { label: "RPG", value: player.rpg.toFixed(1) },
+    { label: "APG", value: player.apg.toFixed(1) },
+    { label: "FG%", value: (player.fg_pct * 100).toFixed(1) },
+    { label: "3P%", value: (player.fg3_pct * 100).toFixed(1) },
+    { label: "FT%", value: (player.ft_pct * 100).toFixed(1) },
+  ];
+
+  const metrics = [
+    { label: "BIS", value: player.bis, color: tierColor(player.bis ?? 0) },
+    { label: "DRS", value: player.drs, color: tierColor(player.drs ?? 0) },
+    { label: "OIQ", value: player.rda, color: tierColor(player.rda ?? 0) },
+    { label: "PEM", value: player.sps, color: tierColor(player.sps ?? 0) },
+    { label: "GOI", value: player.goi, color: tierColor(player.goi ?? 0) },
+    { label: "LFI", value: player.lfi, color: tierColor(player.lfi ?? 0) },
+  ];
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full">
+      <div className="text-center mb-6">
+        <h3 className="text-3xl font-bold text-white">{player.name}</h3>
+        <p className="text-sm text-gray-400 mt-1">{player.team} · {player.position || "—"} · 2025-26</p>
+      </div>
+
+      {/* BIS Hero */}
+      {player.bis != null && (
+        <div className="text-center mb-6">
+          <span className="text-6xl font-bold" style={{ color: tierColor(player.bis) }}>{player.bis.toFixed(0)}</span>
+          <p className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider mt-1">BIS</p>
+        </div>
+      )}
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-6 gap-4 mb-6">
+        {stats.map(s => (
+          <div key={s.label} className="text-center">
+            <p className="text-lg font-bold text-white tabular-nums">{s.value}</p>
+            <p className="text-[9px] text-gray-500 uppercase tracking-wider">{s.label}</p>
           </div>
-        );
-      })}
+        ))}
+      </div>
+
+      {/* CourtVision metrics */}
+      <div className="grid grid-cols-6 gap-3">
+        {metrics.map(m => (
+          <div key={m.label} className="text-center">
+            <p className="text-xl font-bold tabular-nums" style={{ color: m.color }}>{m.value?.toFixed(0) ?? "—"}</p>
+            <p className="text-[9px] text-gray-500 uppercase tracking-wider">{m.label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function MatchupCard({ teams }: { teams: TeamData[] }) {
-  // Show top 2 teams as a matchup
   const t1 = teams[0];
   const t2 = teams[1];
   if (!t1 || !t2) return null;
 
+  const comparisons = [
+    { label: "Record", v1: `${t1.wins}-${t1.losses}`, v2: `${t2.wins}-${t2.losses}`, n1: t1.wins, n2: t2.wins },
+    { label: "TSC", v1: t1.tsc?.toFixed(0) ?? "—", v2: t2.tsc?.toFixed(0) ?? "—", n1: t1.tsc ?? 0, n2: t2.tsc ?? 0 },
+    { label: "Elo", v1: t1.elo?.toFixed(0) ?? "—", v2: t2.elo?.toFixed(0) ?? "—", n1: t1.elo ?? 0, n2: t2.elo ?? 0 },
+    { label: "ORTG", v1: t1.ortg?.toFixed(1) ?? "—", v2: t2.ortg?.toFixed(1) ?? "—", n1: t1.ortg ?? 0, n2: t2.ortg ?? 0 },
+    { label: "DRTG", v1: t1.drtg?.toFixed(1) ?? "—", v2: t2.drtg?.toFixed(1) ?? "—", n1: t1.drtg ?? 0, n2: t2.drtg ?? 0, invert: true },
+  ];
+
   return (
-    <div className="flex items-center justify-center gap-8 py-8">
-      <div className="text-center">
-        <p className="text-2xl font-bold text-white">{t1.abbr}</p>
-        <p className="text-sm text-text-muted/80">{t1.wins}-{t1.losses}</p>
-        {t1.tsc && <p className="text-[11px] font-mono mt-1" style={{ color: tierColor(t1.tsc) }}>TSC {t1.tsc.toFixed(0)}</p>}
-        {t1.elo && <p className="text-[10px] text-text-muted/70 font-mono">Elo {t1.elo.toFixed(0)}</p>}
+    <div className="flex flex-col items-center justify-center h-full">
+      <div className="flex items-center gap-12 mb-8">
+        <div className="text-center">
+          <p className="text-3xl font-bold text-white">{t1.abbr}</p>
+          <p className="text-sm text-gray-400">{t1.name}</p>
+          <p className="text-sm text-gray-500 font-mono">{t1.wins}-{t1.losses}</p>
+        </div>
+        <p className="text-2xl font-bold text-gray-600">VS</p>
+        <div className="text-center">
+          <p className="text-3xl font-bold text-white">{t2.abbr}</p>
+          <p className="text-sm text-gray-400">{t2.name}</p>
+          <p className="text-sm text-gray-500 font-mono">{t2.wins}-{t2.losses}</p>
+        </div>
       </div>
-      <div className="text-center">
-        <p className="text-3xl font-bold text-text-muted/50">VS</p>
-      </div>
-      <div className="text-center">
-        <p className="text-2xl font-bold text-white">{t2.abbr}</p>
-        <p className="text-sm text-text-muted/80">{t2.wins}-{t2.losses}</p>
-        {t2.tsc && <p className="text-[11px] font-mono mt-1" style={{ color: tierColor(t2.tsc) }}>TSC {t2.tsc.toFixed(0)}</p>}
-        {t2.elo && <p className="text-[10px] text-text-muted/70 font-mono">Elo {t2.elo.toFixed(0)}</p>}
+      <div className="w-full max-w-md space-y-2">
+        {comparisons.map(c => {
+          const better1 = c.invert ? c.n1 < c.n2 : c.n1 > c.n2;
+          return (
+            <div key={c.label} className="flex items-center gap-3">
+              <span className={`w-16 text-right font-mono text-sm font-bold ${better1 ? "text-indigo-400" : "text-gray-500"}`}>{c.v1}</span>
+              <div className="flex-1 text-center">
+                <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">{c.label}</span>
+              </div>
+              <span className={`w-16 font-mono text-sm font-bold ${!better1 ? "text-indigo-400" : "text-gray-500"}`}>{c.v2}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
