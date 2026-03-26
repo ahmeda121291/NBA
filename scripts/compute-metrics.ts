@@ -20,9 +20,15 @@ function clamp(val: number, min = 0, max = 100): number {
 }
 
 function normalize(val: number, leagueAvg: number, stdApprox: number): number {
-  // Return a 0-100 scale where 50 = league average
   if (stdApprox === 0) return 50;
   const z = (val - leagueAvg) / stdApprox;
+  return clamp(50 + z * 15, 0, 100);
+}
+
+/** Invert a normalized score — lower raw value = higher score */
+function invertNorm(val: number, leagueAvg: number, std: number): number {
+  if (std === 0) return 50;
+  const z = (leagueAvg - val) / std; // inverted: below avg is good
   return clamp(50 + z * 15, 0, 100);
 }
 
@@ -34,13 +40,17 @@ function tierLabel(score: number): string {
   return "poor";
 }
 
+function num(v: any, fallback = 0): number {
+  const n = parseFloat(v);
+  return isNaN(n) ? fallback : n;
+}
+
 // ---------------------------------------------------------------------------
 // MAIN
 // ---------------------------------------------------------------------------
 async function main() {
-  console.log("=== CourtVision Metric Computation Engine ===\n");
+  console.log("=== CourtVision Metric Computation Engine v2 ===\n");
 
-  // 1. Get current season
   const [currentSeason] = await sql`
     SELECT id, year, label FROM seasons WHERE is_current = true LIMIT 1
   `;
@@ -49,15 +59,14 @@ async function main() {
     process.exit(1);
   }
   const seasonId = currentSeason.id;
-  const asOfDate = new Date().toISOString().split("T")[0]; // today
+  const asOfDate = new Date().toISOString().split("T")[0];
   console.log(`Season: ${currentSeason.label} (id=${seasonId}), as_of_date: ${asOfDate}\n`);
 
   // =========================================================================
   // PLAYER METRICS
   // =========================================================================
-  console.log("--- Computing Player Metrics ---");
+  console.log("--- Computing Player Metrics (v2) ---");
 
-  // Fetch all player season stats for this season
   const playerStats = await sql`
     SELECT
       pss.*,
@@ -71,191 +80,208 @@ async function main() {
   console.log(`Found ${playerStats.length} player season stat rows.`);
 
   if (playerStats.length === 0) {
-    console.log("No player stats found. Skipping player metrics.");
+    console.log("No player stats found. Skipping.");
   }
 
-  // Compute league averages
-  const leagueAvg = {
-    ppg: 0, rpg: 0, apg: 0, spg: 0, bpg: 0, fgPct: 0, gp: 0,
-    topg: 0, usgPct: 0, fg3Pct: 0, tsPct: 0, astPct: 0, tovPct: 0,
-  };
+  // ---- League averages & std devs ----
+  const fields = [
+    "ppg", "rpg", "apg", "spg", "bpg", "fg_pct", "games_played",
+    "topg", "usg_pct", "fg3_pct", "ts_pct", "ast_pct", "tov_pct", "mpg",
+    "def_rating", "contested_shots", "deflections", "def_ws",
+    "loose_balls", "box_outs",
+  ];
+
+  const avg: Record<string, number> = {};
+  const std: Record<string, number> = {};
   const n = playerStats.length || 1;
+
+  // Compute averages
+  for (const f of fields) avg[f] = 0;
   for (const p of playerStats) {
-    leagueAvg.ppg += parseFloat(p.ppg || "0");
-    leagueAvg.rpg += parseFloat(p.rpg || "0");
-    leagueAvg.apg += parseFloat(p.apg || "0");
-    leagueAvg.spg += parseFloat(p.spg || "0");
-    leagueAvg.bpg += parseFloat(p.bpg || "0");
-    leagueAvg.fgPct += parseFloat(p.fg_pct || "0");
-    leagueAvg.gp += parseInt(p.games_played || "0");
-    leagueAvg.topg += parseFloat(p.topg || "0");
-    leagueAvg.usgPct += parseFloat(p.usg_pct || "0");
-    leagueAvg.fg3Pct += parseFloat(p.fg3_pct || "0");
-    leagueAvg.tsPct += parseFloat(p.ts_pct || "0");
-    leagueAvg.astPct += parseFloat(p.ast_pct || "0");
-    leagueAvg.tovPct += parseFloat(p.tov_pct || "0");
+    for (const f of fields) avg[f] += num(p[f]);
   }
-  for (const key of Object.keys(leagueAvg) as (keyof typeof leagueAvg)[]) {
-    leagueAvg[key] /= n;
+  for (const f of fields) avg[f] /= n;
+
+  // Compute std devs
+  for (const f of fields) std[f] = 0;
+  for (const p of playerStats) {
+    for (const f of fields) std[f] += (num(p[f]) - avg[f]) ** 2;
+  }
+  for (const f of fields) std[f] = Math.sqrt(std[f] / n) || 1;
+
+  // Position-specific averages for OIQ (formerly RDA)
+  const posGroups: Record<string, any[]> = { G: [], F: [], C: [] };
+  for (const p of playerStats) {
+    const pos = (p.position || "G").toUpperCase();
+    if (pos.includes("C")) posGroups.C.push(p);
+    else if (pos.includes("F")) posGroups.F.push(p);
+    else posGroups.G.push(p);
+  }
+  const posAvgUsg: Record<string, number> = {};
+  for (const [pos, players] of Object.entries(posGroups)) {
+    posAvgUsg[pos] = players.length > 0
+      ? players.reduce((s, p) => s + num(p.usg_pct), 0) / players.length
+      : avg.usg_pct;
   }
 
-  // Approximate standard deviations (use simple calculation)
-  const leagueStd = {
-    ppg: 0, rpg: 0, apg: 0, spg: 0, bpg: 0, fgPct: 0, gp: 0,
-    topg: 0, usgPct: 0, fg3Pct: 0, tsPct: 0, astPct: 0, tovPct: 0,
-  };
-  for (const p of playerStats) {
-    leagueStd.ppg += (parseFloat(p.ppg || "0") - leagueAvg.ppg) ** 2;
-    leagueStd.rpg += (parseFloat(p.rpg || "0") - leagueAvg.rpg) ** 2;
-    leagueStd.apg += (parseFloat(p.apg || "0") - leagueAvg.apg) ** 2;
-    leagueStd.spg += (parseFloat(p.spg || "0") - leagueAvg.spg) ** 2;
-    leagueStd.bpg += (parseFloat(p.bpg || "0") - leagueAvg.bpg) ** 2;
-    leagueStd.fgPct += (parseFloat(p.fg_pct || "0") - leagueAvg.fgPct) ** 2;
-    leagueStd.gp += (parseInt(p.games_played || "0") - leagueAvg.gp) ** 2;
-    leagueStd.topg += (parseFloat(p.topg || "0") - leagueAvg.topg) ** 2;
-    leagueStd.usgPct += (parseFloat(p.usg_pct || "0") - leagueAvg.usgPct) ** 2;
-    leagueStd.fg3Pct += (parseFloat(p.fg3_pct || "0") - leagueAvg.fg3Pct) ** 2;
-    leagueStd.tsPct += (parseFloat(p.ts_pct || "0") - leagueAvg.tsPct) ** 2;
-    leagueStd.astPct += (parseFloat(p.ast_pct || "0") - leagueAvg.astPct) ** 2;
-    leagueStd.tovPct += (parseFloat(p.tov_pct || "0") - leagueAvg.tovPct) ** 2;
-  }
-  for (const key of Object.keys(leagueStd) as (keyof typeof leagueStd)[]) {
-    leagueStd[key] = Math.sqrt(leagueStd[key] / n) || 1;
-  }
-
-  // Fetch game logs for LFI computation (last 5 games per player)
+  // ---- Game logs for LFI + GOI ----
   const gameLogs = await sql`
     SELECT
       pgl.player_id,
       pgl.pts, pgl.reb, pgl.ast, pgl.stl, pgl.blk,
-      pgl.fgm, pgl.fga, pgl.plus_minus, pgl.minutes,
-      g.game_date
+      pgl.fgm, pgl.fga, pgl.fg3m, pgl.fg3a, pgl.ftm, pgl.fta,
+      pgl.plus_minus, pgl.minutes,
+      g.game_date, g.home_score, g.away_score
     FROM player_game_logs pgl
     JOIN games g ON g.id = pgl.game_id
     WHERE pgl.season_id = ${seasonId}
-      AND pgl.status = 'active'
     ORDER BY pgl.player_id, g.game_date DESC
   `;
 
-  // Group game logs by player
-  const logsByPlayer: Record<number, typeof gameLogs> = {};
+  const logsByPlayer: Record<number, any[]> = {};
   for (const log of gameLogs) {
     const pid = log.player_id;
     if (!logsByPlayer[pid]) logsByPlayer[pid] = [];
     logsByPlayer[pid].push(log);
   }
 
-  // Compute per-player metrics
+  // ---- Compute per-player metrics ----
   type PlayerMetricRow = {
     playerId: number;
-    bis: number;
-    bisConfidence: number;
-    bisComponents: object;
-    rda: number;
-    rdaConfidence: number;
-    rdaLabel: string;
-    rdaComponents: object;
-    drs: number;
-    drsConfidence: number;
-    drsLabel: string;
-    drsComponents: object;
-    lfi: number;
-    lfiConfidence: number;
-    lfiStreakLabel: string;
-    lfiWindows: object;
-    lfiDelta: number;
-    sps: number;
-    spsConfidence: number;
-    spsLabel: string;
-    spsComponents: object;
-    goi: number;
-    goiConfidence: number;
-    goiComponents: object;
+    bis: number; bisConfidence: number; bisComponents: object;
+    rda: number; rdaConfidence: number; rdaLabel: string; rdaComponents: object;
+    drs: number; drsConfidence: number; drsLabel: string; drsComponents: object;
+    lfi: number; lfiConfidence: number; lfiStreakLabel: string; lfiWindows: object; lfiDelta: number;
+    sps: number; spsConfidence: number; spsLabel: string; spsComponents: object;
+    goi: number; goiConfidence: number; goiComponents: object;
   };
 
   const playerMetrics: PlayerMetricRow[] = [];
 
   for (const ps of playerStats) {
     const playerId = ps.player_id;
-    const gp = parseInt(ps.games_played || "0");
-    const ppg = parseFloat(ps.ppg || "0");
-    const rpg = parseFloat(ps.rpg || "0");
-    const apg = parseFloat(ps.apg || "0");
-    const spg = parseFloat(ps.spg || "0");
-    const bpg = parseFloat(ps.bpg || "0");
-    const fgPct = parseFloat(ps.fg_pct || "0");
-    const fg3Pct = parseFloat(ps.fg3_pct || "0");
-    const tsPct = parseFloat(ps.ts_pct || "0");
-    const usgPct = parseFloat(ps.usg_pct || "0");
-    const astPct = parseFloat(ps.ast_pct || "0");
-    const tovPct = parseFloat(ps.tov_pct || "0");
-    const topg = parseFloat(ps.topg || "0");
+    const gp = num(ps.games_played);
+    const ppg = num(ps.ppg);
+    const rpg = num(ps.rpg);
+    const apg = num(ps.apg);
+    const spg = num(ps.spg);
+    const bpg = num(ps.bpg);
+    const topg = num(ps.topg);
+    const mpg = num(ps.mpg, 1);
+    const fgPct = num(ps.fg_pct);
+    const fg3Pct = num(ps.fg3_pct);
+    const tsPct = num(ps.ts_pct);
+    const usgPct = num(ps.usg_pct);
+    const astPct = num(ps.ast_pct);
+    const tovPct = num(ps.tov_pct);
+    const defRating = num(ps.def_rating);
+    const defWs = num(ps.def_ws);
+    const contestedShots = num(ps.contested_shots);
+    const deflections = num(ps.deflections);
+    const chargesDrawn = num(ps.charges_drawn);
+    const looseBalls = num(ps.loose_balls);
+    const boxOuts = num(ps.box_outs);
+
     const position = (ps.position || "G").toUpperCase();
     const isGuard = position.includes("G");
     const isBig = position.includes("C") || position.includes("F");
+    const posGroup = position.includes("C") ? "C" : position.includes("F") ? "F" : "G";
 
-    // ---- BIS (Baseline Impact Score) ----
-    const ppgNorm = normalize(ppg, leagueAvg.ppg, leagueStd.ppg);
-    const rpgNorm = normalize(rpg, leagueAvg.rpg, leagueStd.rpg);
-    const apgNorm = normalize(apg, leagueAvg.apg, leagueStd.apg);
-    const spgNorm = normalize(spg, leagueAvg.spg, leagueStd.spg);
-    const bpgNorm = normalize(bpg, leagueAvg.bpg, leagueStd.bpg);
-    const fgNorm = normalize(fgPct, leagueAvg.fgPct, leagueStd.fgPct);
-    const gpNorm = normalize(gp, leagueAvg.gp, leagueStd.gp);
-
-    const bis = clamp(
-      ppgNorm * 0.25 +
-      rpgNorm * 0.15 +
-      apgNorm * 0.20 +
-      spgNorm * 0.10 +
-      bpgNorm * 0.10 +
-      fgNorm * 0.10 +
-      gpNorm * 0.10
-    );
-    // Confidence based on games played (82-game season)
+    const logs = logsByPlayer[playerId] || [];
     const bisConfidence = clamp(Math.min(gp / 50, 1), 0, 1);
 
-    // ---- RDA (Role Difficulty Adjusted) ----
-    const usgNorm = normalize(usgPct, leagueAvg.usgPct, leagueStd.usgPct);
-    // Approximate unassisted shot rate from 3P% (higher 3P attempts = harder shots)
-    const fg3Norm = normalize(fg3Pct, leagueAvg.fg3Pct, leagueStd.fg3Pct);
-    const tsNorm = normalize(tsPct, leagueAvg.tsPct, leagueStd.tsPct);
-    // Combine: high usage + maintaining efficiency = hard role done well
-    const rda = clamp(usgNorm * 0.40 + fg3Norm * 0.20 + tsNorm * 0.25 + ppgNorm * 0.15);
-    const rdaConfidence = bisConfidence;
-    const rdaLabel = tierLabel(rda);
+    // ==================================================================
+    // BIS v2 — Per-minute scaling, TS%, +/-, TOV penalty, DEF_RATING
+    // ==================================================================
+    // Per-36 normalize: scale stats as if player played 36 min
+    const per36Factor = mpg > 10 ? 36 / mpg : 1;
+    const ppg36 = ppg * per36Factor;
+    const rpg36 = rpg * per36Factor;
+    const apg36 = apg * per36Factor;
+    const spg36 = spg * per36Factor;
+    const bpg36 = bpg * per36Factor;
+    const topg36 = topg * per36Factor;
 
-    // ---- DRS (Defensive Reality Score) ----
-    // Uses real defensive data: DEF_RATING, contested shots, deflections, charges, hustle stats
-    const defRating = parseFloat(ps.def_rating || "0");
-    const defWs = parseFloat(ps.def_ws || "0");
-    const contestedShots = parseFloat(ps.contested_shots || "0");
-    const deflections = parseFloat(ps.deflections || "0");
-    const chargesDrawn = parseFloat(ps.charges_drawn || "0");
-    const looseBalls = parseFloat(ps.loose_balls || "0");
-    const boxOuts = parseFloat(ps.box_outs || "0");
-    const oppPtsPaint = parseFloat(ps.opp_pts_paint || "0");
+    // Z-score normalized (per-36)
+    const ppgNorm = normalize(ppg36, avg.ppg * (36 / (avg.mpg || 30)), std.ppg * (36 / (avg.mpg || 30)));
+    const rpgNorm = normalize(rpg, avg.rpg, std.rpg); // rebounds less min-dependent
+    const apgNorm = normalize(apg36, avg.apg * (36 / (avg.mpg || 30)), std.apg * (36 / (avg.mpg || 30)));
+    const spgNorm = normalize(spg, avg.spg, std.spg);
+    const bpgNorm = normalize(bpg, avg.bpg, std.bpg);
+    const tsNorm = normalize(tsPct, avg.ts_pct || 0.56, std.ts_pct || 0.04);
+    const gpNorm = normalize(gp, avg.games_played, std.games_played);
 
+    // +/- from game logs (avg of last 15 games)
+    const recentLogs = logs.slice(0, 15);
+    const avgPlusMinus = recentLogs.length > 0
+      ? recentLogs.reduce((s, l) => s + num(l.plus_minus), 0) / recentLogs.length
+      : 0;
+    const pmNorm = clamp(50 + avgPlusMinus * 2, 0, 100);
+
+    // TOV penalty (inverted: lower TOV = better)
+    const tovPenalty = topg > 0 ? invertNorm(topg, avg.topg, std.topg) : 50;
+
+    // DEF_RATING component for BIS (small weight)
+    const defComponent = defRating > 0 ? clamp(50 + (112 - defRating) * 2.5, 0, 100) : 50;
+
+    const bis = clamp(
+      ppgNorm * 0.20 +      // scoring (per-36)
+      rpgNorm * 0.12 +      // rebounding
+      apgNorm * 0.15 +      // playmaking (per-36)
+      tsNorm * 0.12 +       // efficiency (TS% not FG%)
+      spgNorm * 0.05 +      // steals
+      bpgNorm * 0.05 +      // blocks
+      pmNorm * 0.10 +       // +/- impact
+      defComponent * 0.06 + // defensive rating
+      tovPenalty * 0.05 +   // turnover penalty (inverted)
+      gpNorm * 0.10         // durability
+    );
+
+    // ==================================================================
+    // OIQ (Offensive Impact Quotient) — stored as rda_score in DB
+    // Position-relative usage + efficiency + creation
+    // ==================================================================
+    // Compare usage to position average (not league average)
+    const posUsgAvg = posAvgUsg[posGroup] || avg.usg_pct;
+    const usgVsPos = usgPct > 0 ? clamp(50 + ((usgPct - posUsgAvg) / (std.usg_pct || 0.05)) * 15, 0, 100) : 50;
+
+    // AST/TOV ratio (higher = better creation)
+    const astTov = topg > 0.5 ? apg / topg : apg > 0 ? apg * 2 : 0;
+    const astTovNorm = clamp(50 + (astTov - 1.5) * 12, 0, 100); // 1.5 is roughly average
+
+    // Free throw rate (FTA/FGA proxy for getting to the line)
+    const ftRate = num(ps.fga) > 0 ? num(ps.fta) / num(ps.fga) : 0;
+    const ftRateNorm = clamp(50 + (ftRate - 0.25) * 80, 0, 100); // 0.25 is roughly avg
+
+    const oiq = clamp(
+      usgVsPos * 0.25 +     // usage relative to position
+      tsNorm * 0.30 +        // true shooting efficiency
+      astTovNorm * 0.20 +    // creation quality
+      ppgNorm * 0.15 +       // volume scoring
+      ftRateNorm * 0.10      // ability to get to the line
+    );
+    const oiqLabel = oiq >= 85 ? "Elite Scorer" : oiq >= 70 ? "High-Impact Offensive Player"
+      : oiq >= 55 ? "Solid Offensive Contributor" : oiq >= 40 ? "Average Offensive Player"
+      : "Limited Offensive Impact";
+
+    // ==================================================================
+    // DRS v2 — Real defensive data (already rebuilt)
+    // ==================================================================
     const hasDefData = defRating > 0 || contestedShots > 0;
-
     let drs: number;
-    if (hasDefData) {
-      // Real defensive data available — use advanced metrics
-      // DEF_RATING: lower is better (league avg ~112), invert and normalize
-      const defRtgNorm = defRating > 0 ? clamp(50 + (112 - defRating) * 3, 0, 100) : 50;
-      // DEF_WS: higher is better (league avg ~0.04/game), normalize
-      const defWsNorm = defWs > 0 ? clamp(normalize(defWs * gp, 1.5, 1.2), 0, 100) : 50;
-      // Contested shots: higher is better (league avg ~5 for starters)
-      const contestNorm = normalize(contestedShots, 4.5, 2.5);
-      // Deflections: higher is better (league avg ~2)
-      const deflNorm = normalize(deflections, 2.0, 1.5);
-      // Charges: higher is better (league avg ~0.2)
-      const chargeNorm = chargesDrawn > 0 ? clamp(50 + chargesDrawn * 30, 0, 100) : 50;
-      // Loose balls: hustle (league avg ~0.5)
-      const hustleNorm = normalize(looseBalls + boxOuts * 0.3, 1.0, 0.8);
 
-      // Weighted: DEF_RATING is king (35%), then contested shots (20%), deflections (15%),
-      // DEF_WS (10%), hustle (10%), traditional STL/BLK (10%)
+    if (hasDefData) {
+      const defRtgNorm = defRating > 0 ? clamp(50 + (112 - defRating) * 3, 0, 100) : 50;
+      const defWsNorm = defWs > 0 ? clamp(normalize(defWs * gp, 1.5, 1.2), 0, 100) : 50;
+      const contestNorm = normalize(contestedShots, avg.contested_shots || 4.5, std.contested_shots || 2.5);
+      const deflNorm = normalize(deflections, avg.deflections || 2.0, std.deflections || 1.5);
+      const chargeNorm = chargesDrawn > 0 ? clamp(50 + chargesDrawn * 25, 0, 100) : 50;
+      const hustleNorm = normalize(
+        looseBalls + boxOuts * 0.3,
+        (avg.loose_balls || 0.5) + (avg.box_outs || 0.5) * 0.3,
+        (std.loose_balls || 0.5) + (std.box_outs || 0.5) * 0.3
+      );
+
       drs = clamp(
         defRtgNorm * 0.35 +
         contestNorm * 0.20 +
@@ -266,13 +292,10 @@ async function main() {
         0, 100
       );
     } else {
-      // Fallback: box score only (less reliable, cap at 70 max)
+      // Fallback: box score only, capped at 70
       const drebFactor = isBig ? 0.7 : 0.3;
-      const estimatedDreb = rpg * drebFactor;
-      const drebNorm = normalize(estimatedDreb, leagueAvg.rpg * drebFactor, leagueStd.rpg * drebFactor);
-      const posAdj = isBig
-        ? bpgNorm * 0.15 + spgNorm * 0.05
-        : spgNorm * 0.15 + bpgNorm * 0.05;
+      const drebNorm = normalize(rpg * drebFactor, avg.rpg * drebFactor, std.rpg * drebFactor);
+      const posAdj = isBig ? bpgNorm * 0.15 + spgNorm * 0.05 : spgNorm * 0.15 + bpgNorm * 0.05;
       drs = clamp((spgNorm * 0.25 + bpgNorm * 0.25 + drebNorm * 0.30 + posAdj) * 0.7, 0, 70);
     }
 
@@ -281,113 +304,195 @@ async function main() {
       ? (drs >= 80 ? "Elite Defender" : drs >= 65 ? "Plus Defender" : drs >= 50 ? "Solid Defender" : drs >= 35 ? "Average Defender" : "Weak Defender")
       : (drs >= 60 ? "Good (box score est.)" : drs >= 40 ? "Average (box score est.)" : "Below Avg (box score est.)");
 
-    // ---- LFI (Live Form Index) ----
-    const logs = logsByPlayer[playerId] || [];
+    // ==================================================================
+    // LFI v2 — Efficiency trend, +/- trend, weighted recency, 10-game blend
+    // ==================================================================
     const last5 = logs.slice(0, 5);
-    let lfi = 50; // default stable
+    const last10 = logs.slice(0, 10);
+    let lfi = 50;
     let lfiDelta = 0;
     let lfiConfidence = 0;
     let lfiStreakLabel = "stable";
 
     if (last5.length >= 3) {
-      const avg5 = {
-        pts: last5.reduce((s, l) => s + (l.pts || 0), 0) / last5.length,
-        reb: last5.reduce((s, l) => s + (l.reb || 0), 0) / last5.length,
-        ast: last5.reduce((s, l) => s + (l.ast || 0), 0) / last5.length,
-        fgPct: last5.reduce((s, l) => {
-          const fga = l.fga || 0;
-          const fgm = l.fgm || 0;
-          return s + (fga > 0 ? fgm / fga : 0);
-        }, 0) / last5.length,
-        plusMinus: last5.reduce((s, l) => s + (l.plus_minus || 0), 0) / last5.length,
-      };
+      // Weighted recency: game 1 = 1.0, game 2 = 0.9, game 3 = 0.8, etc.
+      function weightedAvg(games: any[], key: string | ((g: any) => number)): number {
+        let totalVal = 0, totalWeight = 0;
+        for (let i = 0; i < games.length; i++) {
+          const w = 1.0 - (i * 0.08); // slight decay
+          const val = typeof key === "function" ? key(games[i]) : num(games[i][key]);
+          totalVal += val * w;
+          totalWeight += w;
+        }
+        return totalWeight > 0 ? totalVal / totalWeight : 0;
+      }
 
-      // Deltas vs season averages
-      const ptsDelta = ppg > 0 ? (avg5.pts - ppg) / (ppg || 1) : 0;
-      const rebDelta = rpg > 0 ? (avg5.reb - rpg) / (rpg || 1) : 0;
-      const astDelta = apg > 0 ? (avg5.ast - apg) / (apg || 1) : 0;
+      // Last 5 (weighted) vs season averages
+      const recentPts = weightedAvg(last5, "pts");
+      const recentReb = weightedAvg(last5, "reb");
+      const recentAst = weightedAvg(last5, "ast");
+      const recentPM = weightedAvg(last5, "plus_minus");
 
-      lfiDelta = (ptsDelta * 0.40 + rebDelta * 0.25 + astDelta * 0.35) * 100;
+      // Efficiency trend: TS% of recent games vs season TS%
+      const recentTS = weightedAvg(last5, (g) => {
+        const fga = num(g.fga); const fta = num(g.fta); const pts = num(g.pts);
+        const denom = 2 * (fga + 0.44 * fta);
+        return denom > 0 ? pts / denom : 0;
+      });
+      const seasonTS = tsPct > 0 ? tsPct : 0.56;
+      const tsDelta = seasonTS > 0 ? (recentTS - seasonTS) / seasonTS : 0;
+
+      // Stat deltas vs season averages
+      const ptsDelta = ppg > 0 ? (recentPts - ppg) / ppg : 0;
+      const rebDelta = rpg > 0 ? (recentReb - rpg) / rpg : 0;
+      const astDelta = apg > 0 ? (recentAst - apg) / apg : 0;
+      const pmDelta = recentPM; // raw +/- (not normalized against season)
+
+      // Combine: scoring trend (30%), assist trend (20%), rebound trend (10%),
+      // efficiency trend (25%), +/- trend (15%)
+      lfiDelta = (
+        ptsDelta * 0.30 +
+        astDelta * 0.20 +
+        rebDelta * 0.10 +
+        tsDelta * 0.25 +
+        clamp(pmDelta / 10, -1, 1) * 0.15
+      ) * 100;
+
+      // Blend: 70% last 5, 30% last 10 for stability
+      if (last10.length >= 6) {
+        const l10PtsDelta = ppg > 0 ? (weightedAvg(last10, "pts") - ppg) / ppg : 0;
+        const l10AstDelta = apg > 0 ? (weightedAvg(last10, "ast") - apg) / apg : 0;
+        const l10Delta = (l10PtsDelta * 0.5 + l10AstDelta * 0.5) * 100;
+        lfiDelta = lfiDelta * 0.70 + l10Delta * 0.30;
+      }
+
       lfi = clamp(50 + lfiDelta * 2);
       lfiConfidence = clamp(Math.min(last5.length / 5, 1), 0, 1);
 
-      // Determine streak label
-      if (lfi >= 70 && avg5.plusMinus > 3) lfiStreakLabel = "hot_likely_real";
-      else if (lfi >= 65 && avg5.plusMinus <= 0) lfiStreakLabel = "hot_opponent_driven";
+      // Streak labels — now factor in efficiency
+      const effUp = tsDelta > 0.02;
+      const effDown = tsDelta < -0.03;
+
+      if (lfi >= 70 && recentPM > 3 && effUp) lfiStreakLabel = "hot_likely_real";
+      else if (lfi >= 65 && recentPM > 2) lfiStreakLabel = "hot_likely_real";
+      else if (lfi >= 65 && recentPM <= -2) lfiStreakLabel = "hot_opponent_driven";
+      else if (lfi >= 60 && effDown) lfiStreakLabel = "hot_fragile";
       else if (lfi >= 60) lfiStreakLabel = "hot_fragile";
-      else if (lfi <= 35 && avg5.plusMinus < -3) lfiStreakLabel = "cold_real";
+      else if (lfi <= 30 && recentPM < -5) lfiStreakLabel = "cold_real";
+      else if (lfi <= 38 && effDown) lfiStreakLabel = "cold_real";
       else if (lfi <= 40) lfiStreakLabel = "cold_bouncing_back";
-      else if (lfi >= 60 && usgPct > leagueAvg.usgPct * 1.2) lfiStreakLabel = "breakout_role_expansion";
+      else if (lfi >= 60 && usgPct > (posAvgUsg[posGroup] || avg.usg_pct) * 1.15) lfiStreakLabel = "breakout_role_expansion";
       else lfiStreakLabel = "stable";
     }
 
-    // ---- SPS (Scalability Profile Score) ----
-    const astNorm = normalize(astPct, leagueAvg.astPct, leagueStd.astPct);
-    const tovNorm = normalize(tovPct, leagueAvg.tovPct, leagueStd.tovPct);
-    // Invert turnover norm: lower TOV% = better
-    const tovInverted = clamp(100 - tovNorm);
-    const sps = clamp(tsNorm * 0.35 + astNorm * 0.30 + tovInverted * 0.25 + gpNorm * 0.10);
-    const spsConfidence = bisConfidence;
-    const spsLabel = tierLabel(sps);
+    // ==================================================================
+    // PEM (Playmaking Efficiency Metric) — stored as sps_score in DB
+    // TS% + AST/TOV ratio + low turnovers + creation
+    // ==================================================================
+    const astNorm = normalize(astPct, avg.ast_pct || 0.1, std.ast_pct || 0.05);
+    const pem = clamp(
+      tsNorm * 0.30 +           // shooting efficiency
+      astTovNorm * 0.30 +       // creation quality (AST/TOV)
+      tovPenalty * 0.20 +       // low turnovers
+      astNorm * 0.20            // raw assist generation
+    );
+    const pemLabel = pem >= 80 ? "Elite Facilitator" : pem >= 65 ? "High-Level Playmaker"
+      : pem >= 50 ? "Capable Playmaker" : pem >= 35 ? "Limited Playmaker" : "Non-Creator";
 
-    // ---- GOI (Game Outcome Influence) ----
+    // ==================================================================
+    // GOI v2 — Clutch performance, filtered garbage time, 4Q scoring
+    // ==================================================================
     let goiPlusMinusScore = 50;
     let goiClutchScore = 50;
+    let goiFourthQScore = 50;
+
     if (logs.length >= 3) {
-      const avgPM = logs.slice(0, 10).reduce((s, l) => s + (l.plus_minus || 0), 0) / Math.min(logs.length, 10);
-      goiPlusMinusScore = clamp(50 + avgPM * 2);
-      // Clutch approximation: variance in plus_minus (consistent positive = clutch)
-      const pmValues = logs.slice(0, 10).map(l => l.plus_minus || 0);
-      const pmStd = Math.sqrt(pmValues.reduce((s, v) => s + (v - avgPM) ** 2, 0) / pmValues.length) || 1;
-      // High mean, low variance = clutch
-      goiClutchScore = clamp(50 + (avgPM / pmStd) * 10);
+      // Filter out garbage time: exclude games decided by 20+
+      const meaningfulGames = logs.slice(0, 15).filter((l) => {
+        const diff = Math.abs(num(l.home_score) - num(l.away_score));
+        return diff < 20 || num(l.minutes) > 20; // keep if close game OR they played real minutes
+      });
+
+      if (meaningfulGames.length >= 3) {
+        const mgPM = meaningfulGames.reduce((s, l) => s + num(l.plus_minus), 0) / meaningfulGames.length;
+        goiPlusMinusScore = clamp(50 + mgPM * 2.5);
+
+        // Consistency: mean/stdev ratio (high mean, low variance = clutch)
+        const pmValues = meaningfulGames.map(l => num(l.plus_minus));
+        const pmStd = Math.sqrt(pmValues.reduce((s, v) => s + (v - mgPM) ** 2, 0) / pmValues.length) || 1;
+        goiClutchScore = clamp(50 + (mgPM / pmStd) * 8);
+
+        // Close game performance: games decided by < 8 points
+        const closeGames = meaningfulGames.filter((l) => {
+          return Math.abs(num(l.home_score) - num(l.away_score)) <= 8;
+        });
+        if (closeGames.length >= 2) {
+          const closePM = closeGames.reduce((s, l) => s + num(l.plus_minus), 0) / closeGames.length;
+          const closePts = closeGames.reduce((s, l) => s + num(l.pts), 0) / closeGames.length;
+          // In close games: do they score more and maintain positive +/-?
+          const closeScoreDelta = ppg > 0 ? (closePts - ppg) / ppg : 0;
+          goiFourthQScore = clamp(50 + closePM * 2 + closeScoreDelta * 30);
+        }
+      } else {
+        // Not enough meaningful games, use raw data
+        const rawPM = logs.slice(0, 10).reduce((s, l) => s + num(l.plus_minus), 0) / Math.min(logs.length, 10);
+        goiPlusMinusScore = clamp(50 + rawPM * 2);
+      }
     }
-    const goi = clamp(goiPlusMinusScore * 0.60 + goiClutchScore * 0.40);
+
+    const goi = clamp(
+      goiPlusMinusScore * 0.40 +  // overall impact (filtered)
+      goiClutchScore * 0.30 +      // consistency under pressure
+      goiFourthQScore * 0.30       // close game performance
+    );
     const goiConfidence = clamp(Math.min((logs.length || 0) / 20, 1), 0, 1);
 
+    // ==================================================================
+    // Push to array
+    // ==================================================================
     playerMetrics.push({
       playerId,
       bis: Math.round(bis * 100) / 100,
       bisConfidence: Math.round(bisConfidence * 100) / 100,
-      bisComponents: { ppg: ppgNorm, rpg: rpgNorm, apg: apgNorm, spg: spgNorm, bpg: bpgNorm, fg: fgNorm, gp: gpNorm },
-      rda: Math.round(rda * 100) / 100,
-      rdaConfidence: Math.round(rdaConfidence * 100) / 100,
-      rdaLabel,
-      rdaComponents: { usage: usgNorm, fg3: fg3Norm, ts: tsNorm, ppg: ppgNorm },
+      bisComponents: { ppg: ppgNorm, rpg: rpgNorm, apg: apgNorm, ts: tsNorm, pm: pmNorm, def: defComponent, tov: tovPenalty, gp: gpNorm },
+      rda: Math.round(oiq * 100) / 100, // OIQ stored in rda column
+      rdaConfidence: Math.round(bisConfidence * 100) / 100,
+      rdaLabel: oiqLabel,
+      rdaComponents: { usgVsPos, ts: tsNorm, astTov: astTovNorm, ppg: ppgNorm, ftRate: ftRateNorm },
       drs: Math.round(drs * 100) / 100,
       drsConfidence: Math.round(drsConfidence * 100) / 100,
       drsLabel,
       drsComponents: hasDefData
-        ? { defRtg: defRating, contested: contestedShots, deflections, defWs, hustle: looseBalls, stl: spgNorm, blk: bpgNorm }
-        : { stl: spgNorm, blk: bpgNorm, boxScoreOnly: true },
+        ? { defRtg: defRating, contested: contestedShots, deflections, defWs, hustle: looseBalls, stl: spg, blk: bpg }
+        : { stl: spg, blk: bpg, boxScoreOnly: true },
       lfi: Math.round(lfi * 100) / 100,
       lfiConfidence: Math.round(lfiConfidence * 100) / 100,
       lfiStreakLabel,
-      lfiWindows: { last5Games: last5.length, delta: lfiDelta },
+      lfiWindows: { last5Games: last5.length, last10Games: last10.length, delta: lfiDelta },
       lfiDelta: Math.round(lfiDelta * 100) / 100,
-      sps: Math.round(sps * 100) / 100,
-      spsConfidence: Math.round(spsConfidence * 100) / 100,
-      spsLabel,
-      spsComponents: { ts: tsNorm, ast: astNorm, tovInv: tovInverted, gp: gpNorm },
+      sps: Math.round(pem * 100) / 100, // PEM stored in sps column
+      spsConfidence: Math.round(bisConfidence * 100) / 100,
+      spsLabel: pemLabel,
+      spsComponents: { ts: tsNorm, astTov: astTovNorm, tovInv: tovPenalty, ast: astNorm },
       goi: Math.round(goi * 100) / 100,
       goiConfidence: Math.round(goiConfidence * 100) / 100,
-      goiComponents: { plusMinus: goiPlusMinusScore, clutch: goiClutchScore },
+      goiComponents: { pm: goiPlusMinusScore, clutch: goiClutchScore, closeGame: goiFourthQScore },
     });
   }
 
-  // Compute BIS percentiles
+  // ---- Compute percentiles ----
   const bisSorted = [...playerMetrics].sort((a, b) => a.bis - b.bis);
   for (const pm of playerMetrics) {
-    const rank = bisSorted.findIndex(x => x.playerId === pm.playerId);
-    (pm as any).bisPercentile = Math.round((rank / (bisSorted.length || 1)) * 10000) / 100;
+    const rank = bisSorted.findIndex(b => b.playerId === pm.playerId);
+    (pm as any).bisPercentile = Math.round((rank / bisSorted.length) * 100);
   }
 
-  // Upsert player metrics
+  // ---- Upsert to DB ----
   let playerCount = 0;
   for (const pm of playerMetrics) {
     await sql`
       INSERT INTO player_metric_snapshots (
-        player_id, season_id, computed_at, as_of_date,
+        player_id, computed_at, as_of_date,
         bis_score, bis_confidence, bis_percentile, bis_components,
         rda_score, rda_confidence, rda_label, rda_components,
         drs_score, drs_confidence, drs_label, drs_components,
@@ -395,7 +500,7 @@ async function main() {
         sps_score, sps_confidence, sps_label, sps_components,
         goi_score, goi_confidence, goi_components
       ) VALUES (
-        ${pm.playerId}, ${seasonId}, NOW(), ${asOfDate},
+        ${pm.playerId}, NOW(), ${asOfDate},
         ${pm.bis}, ${pm.bisConfidence}, ${(pm as any).bisPercentile}, ${JSON.stringify(pm.bisComponents)},
         ${pm.rda}, ${pm.rdaConfidence}, ${pm.rdaLabel}, ${JSON.stringify(pm.rdaComponents)},
         ${pm.drs}, ${pm.drsConfidence}, ${pm.drsLabel}, ${JSON.stringify(pm.drsComponents)},
@@ -406,29 +511,18 @@ async function main() {
       ON CONFLICT (player_id)
       DO UPDATE SET
         computed_at = NOW(),
-        bis_score = EXCLUDED.bis_score,
-        bis_confidence = EXCLUDED.bis_confidence,
-        bis_percentile = EXCLUDED.bis_percentile,
-        bis_components = EXCLUDED.bis_components,
-        rda_score = EXCLUDED.rda_score,
-        rda_confidence = EXCLUDED.rda_confidence,
-        rda_label = EXCLUDED.rda_label,
-        rda_components = EXCLUDED.rda_components,
-        drs_score = EXCLUDED.drs_score,
-        drs_confidence = EXCLUDED.drs_confidence,
-        drs_label = EXCLUDED.drs_label,
-        drs_components = EXCLUDED.drs_components,
-        lfi_score = EXCLUDED.lfi_score,
-        lfi_confidence = EXCLUDED.lfi_confidence,
-        lfi_streak_label = EXCLUDED.lfi_streak_label,
-        lfi_windows = EXCLUDED.lfi_windows,
+        bis_score = EXCLUDED.bis_score, bis_confidence = EXCLUDED.bis_confidence,
+        bis_percentile = EXCLUDED.bis_percentile, bis_components = EXCLUDED.bis_components,
+        rda_score = EXCLUDED.rda_score, rda_confidence = EXCLUDED.rda_confidence,
+        rda_label = EXCLUDED.rda_label, rda_components = EXCLUDED.rda_components,
+        drs_score = EXCLUDED.drs_score, drs_confidence = EXCLUDED.drs_confidence,
+        drs_label = EXCLUDED.drs_label, drs_components = EXCLUDED.drs_components,
+        lfi_score = EXCLUDED.lfi_score, lfi_confidence = EXCLUDED.lfi_confidence,
+        lfi_streak_label = EXCLUDED.lfi_streak_label, lfi_windows = EXCLUDED.lfi_windows,
         lfi_delta = EXCLUDED.lfi_delta,
-        sps_score = EXCLUDED.sps_score,
-        sps_confidence = EXCLUDED.sps_confidence,
-        sps_label = EXCLUDED.sps_label,
-        sps_components = EXCLUDED.sps_components,
-        goi_score = EXCLUDED.goi_score,
-        goi_confidence = EXCLUDED.goi_confidence,
+        sps_score = EXCLUDED.sps_score, sps_confidence = EXCLUDED.sps_confidence,
+        sps_label = EXCLUDED.sps_label, sps_components = EXCLUDED.sps_components,
+        goi_score = EXCLUDED.goi_score, goi_confidence = EXCLUDED.goi_confidence,
         goi_components = EXCLUDED.goi_components
     `;
     playerCount++;
@@ -436,160 +530,133 @@ async function main() {
   console.log(`Upserted ${playerCount} player metric snapshots.\n`);
 
   // =========================================================================
-  // TEAM METRICS
+  // TEAM METRICS (improved)
   // =========================================================================
-  console.log("--- Computing Team Metrics ---");
+  console.log("--- Computing Team Metrics (v2) ---");
 
   const teamStats = await sql`
-    SELECT
-      tss.*,
-      t.name AS team_name,
-      t.abbreviation
+    SELECT tss.*, t.name AS team_name, t.abbreviation
     FROM team_season_stats tss
     JOIN teams t ON t.id = tss.team_id
     WHERE tss.season_id = ${seasonId}
   `;
   console.log(`Found ${teamStats.length} team season stat rows.`);
 
-  // League averages for teams
-  const teamLeagueAvg = {
-    winPct: 0, fgPct: 0, drtg: 0, ortg: 0, pace: 0,
-  };
+  // Team league averages
+  const teamAvg = { winPct: 0, fgPct: 0, drtg: 0, ortg: 0, pace: 0, netRtg: 0 };
   const tn = teamStats.length || 1;
   for (const t of teamStats) {
-    const wins = parseInt(t.wins || "0");
-    const losses = parseInt(t.losses || "0");
-    const total = wins + losses || 1;
-    teamLeagueAvg.winPct += wins / total;
-    teamLeagueAvg.fgPct += parseFloat(t.fg_pct || "0");
-    teamLeagueAvg.drtg += parseFloat(t.drtg || "110");
-    teamLeagueAvg.ortg += parseFloat(t.ortg || "110");
-    teamLeagueAvg.pace += parseFloat(t.pace || "100");
+    const w = num(t.wins); const l = num(t.losses);
+    teamAvg.winPct += w / (w + l || 1);
+    teamAvg.fgPct += num(t.fg_pct);
+    teamAvg.drtg += num(t.drtg, 112);
+    teamAvg.ortg += num(t.ortg, 112);
+    teamAvg.pace += num(t.pace, 100);
+    teamAvg.netRtg += num(t.net_rating);
   }
-  for (const key of Object.keys(teamLeagueAvg) as (keyof typeof teamLeagueAvg)[]) {
-    teamLeagueAvg[key] /= tn;
-  }
+  for (const k of Object.keys(teamAvg) as (keyof typeof teamAvg)[]) teamAvg[k] /= tn;
 
-  // Build map of player BIS scores by team
-  const bisScoresByTeam: Record<number, number[]> = {};
-  // We need roster -> team mapping
-  const rosterRows = await sql`
-    SELECT player_id, team_id FROM rosters WHERE season_id = ${seasonId}
-  `;
+  // Player BIS by team (weighted by minutes)
+  const bisScoresByTeam: Record<number, { bis: number; mpg: number }[]> = {};
+  const rosterRows = await sql`SELECT player_id, team_id FROM rosters WHERE season_id = ${seasonId}`;
   const playerTeamMap: Record<number, number> = {};
-  for (const r of rosterRows) {
-    playerTeamMap[r.player_id] = r.team_id;
-  }
+  for (const r of rosterRows) playerTeamMap[r.player_id] = r.team_id;
   for (const pm of playerMetrics) {
     const teamId = playerTeamMap[pm.playerId];
     if (teamId) {
       if (!bisScoresByTeam[teamId]) bisScoresByTeam[teamId] = [];
-      bisScoresByTeam[teamId].push(pm.bis);
+      const ps = playerStats.find(p => p.player_id === pm.playerId);
+      bisScoresByTeam[teamId].push({ bis: pm.bis, mpg: num(ps?.mpg) });
     }
   }
 
-  // Fetch recent team games for LTFI
+  // Recent games by team
   const recentTeamGames = await sql`
-    SELECT
-      g.home_team_id, g.away_team_id,
-      g.home_score, g.away_score,
-      g.game_date
-    FROM games g
-    WHERE g.season_id = ${seasonId}
-      AND g.status = 'final'
-    ORDER BY g.game_date DESC
+    SELECT home_team_id, away_team_id, home_score, away_score, game_date
+    FROM games WHERE season_id = ${seasonId} AND status = 'final'
+    ORDER BY game_date DESC
   `;
+  const gamesByTeam: Record<number, { won: boolean; margin: number; oppNetRtg: number }[]> = {};
+  // Build team net rating lookup
+  const teamNetRtgMap: Record<number, number> = {};
+  for (const t of teamStats) teamNetRtgMap[t.team_id] = num(t.net_rating);
 
-  // Group games by team
-  const gamesByTeam: Record<number, Array<{won: boolean; date: string; margin: number}>> = {};
   for (const g of recentTeamGames) {
-    const homeId = g.home_team_id;
-    const awayId = g.away_team_id;
-    const homeScore = g.home_score || 0;
-    const awayScore = g.away_score || 0;
-    if (!gamesByTeam[homeId]) gamesByTeam[homeId] = [];
-    if (!gamesByTeam[awayId]) gamesByTeam[awayId] = [];
-    gamesByTeam[homeId].push({ won: homeScore > awayScore, date: g.game_date, margin: homeScore - awayScore });
-    gamesByTeam[awayId].push({ won: awayScore > homeScore, date: g.game_date, margin: awayScore - homeScore });
-  }
-  // Sort each team's games by date desc
-  for (const teamId of Object.keys(gamesByTeam)) {
-    gamesByTeam[parseInt(teamId)].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const hid = g.home_team_id; const aid = g.away_team_id;
+    const hs = num(g.home_score); const as_ = num(g.away_score);
+    if (!gamesByTeam[hid]) gamesByTeam[hid] = [];
+    if (!gamesByTeam[aid]) gamesByTeam[aid] = [];
+    gamesByTeam[hid].push({ won: hs > as_, margin: hs - as_, oppNetRtg: teamNetRtgMap[aid] || 0 });
+    gamesByTeam[aid].push({ won: as_ > hs, margin: as_ - hs, oppNetRtg: teamNetRtgMap[hid] || 0 });
   }
 
-  // Fetch injury counts per team for Roster Penalty
-  const injuryCounts = await sql`
-    SELECT team_id, COUNT(*) as cnt
-    FROM player_injuries
-    WHERE season_id = ${seasonId} AND is_current = true
-    GROUP BY team_id
+  // Injury BIS impact
+  const injuryBIS = await sql`
+    SELECT pi.team_id, SUM(COALESCE(pms.bis_score, 40)) as total_bis, COUNT(*) as cnt
+    FROM player_injuries pi
+    LEFT JOIN player_metric_snapshots pms ON pms.player_id = pi.player_id
+    WHERE pi.season_id = ${seasonId} AND pi.is_current = true AND pi.status IN ('Out', 'out')
+    GROUP BY pi.team_id
   `;
-  const injuryByTeam: Record<number, number> = {};
-  for (const ic of injuryCounts) {
-    injuryByTeam[ic.team_id] = parseInt(ic.cnt || "0");
+  const injuryImpact: Record<number, { totalBis: number; count: number }> = {};
+  for (const ib of injuryBIS) {
+    injuryImpact[ib.team_id] = { totalBis: num(ib.total_bis), count: num(ib.cnt) };
   }
 
   let teamCount = 0;
   for (const ts of teamStats) {
     const teamId = ts.team_id;
-    const wins = parseInt(ts.wins || "0");
-    const losses = parseInt(ts.losses || "0");
-    const total = wins + losses || 1;
-    const winPct = wins / total;
-    const fgPct = parseFloat(ts.fg_pct || "0");
-    const drtg = parseFloat(ts.drtg || "110");
-    const ortg = parseFloat(ts.ortg || "110");
-    const pace = parseFloat(ts.pace || "100");
-    const sos = parseFloat(ts.sos || "0");
-    const sosRemaining = parseFloat(ts.sos_remaining || "0");
+    const w = num(ts.wins); const l = num(ts.losses);
+    const winPct = w / (w + l || 1);
+    const drtg = num(ts.drtg, 112);
+    const ortg = num(ts.ortg, 112);
+    const netRtg = num(ts.net_rating);
+    const sos = num(ts.sos);
 
-    // ---- TSC (Team Strength Composite) ----
-    const teamBIS = bisScoresByTeam[teamId] || [];
-    const topBIS = teamBIS.sort((a, b) => b - a).slice(0, 3);
-    const avgTopBIS = topBIS.length > 0 ? topBIS.reduce((s, v) => s + v, 0) / topBIS.length : 50;
-    const depthCount = teamBIS.filter(b => b > 50).length;
-    const depthScore = clamp(depthCount * 10, 0, 100); // 10 players with BIS>50 = 100
-
+    // ---- TSC v2: Win% + talent (BIS weighted by MPG) + depth ----
+    const teamPlayers = bisScoresByTeam[teamId] || [];
+    const weightedBIS = teamPlayers.length > 0
+      ? teamPlayers.reduce((s, p) => s + p.bis * Math.min(p.mpg, 36), 0) / teamPlayers.reduce((s, p) => s + Math.min(p.mpg, 36), 0)
+      : 50;
+    const depthCount = teamPlayers.filter(p => p.bis > 50 && p.mpg > 15).length;
+    const depthScore = clamp(depthCount * 12, 0, 100);
     const winPctScore = clamp(winPct * 100);
-    const tsc = clamp(winPctScore * 0.35 + avgTopBIS * 0.35 + depthScore * 0.30);
-    const tscConfidence = clamp(Math.min(total / 40, 1), 0, 1);
+    const tsc = clamp(winPctScore * 0.35 + weightedBIS * 0.35 + depthScore * 0.30);
 
-    // ---- LTFI (Live Team Form Index) ----
+    // ---- LTFI v2: SOS-adjusted recent form ----
     const tGames = (gamesByTeam[teamId] || []).slice(0, 10);
     let ltfi = 50;
-    let ltfiConfidence = 0;
     if (tGames.length >= 3) {
-      const recentWinPct = tGames.filter(g => g.won).length / tGames.length;
+      // Weight wins by opponent quality
+      let weightedWins = 0, totalWeight = 0;
+      for (const g of tGames) {
+        const oppStr = clamp((g.oppNetRtg + 10) / 20 * 100, 20, 100) / 100; // 0.2 to 1.0
+        const w = 0.5 + oppStr * 0.5; // beating good teams counts more
+        weightedWins += g.won ? w : 0;
+        totalWeight += w;
+      }
+      const adjWinPct = totalWeight > 0 ? weightedWins / totalWeight : 0.5;
       const avgMargin = tGames.reduce((s, g) => s + g.margin, 0) / tGames.length;
-      ltfi = clamp(recentWinPct * 60 + 20 + avgMargin * 0.5);
-      ltfiConfidence = clamp(Math.min(tGames.length / 10, 1), 0, 1);
+      ltfi = clamp(adjWinPct * 60 + 20 + avgMargin * 0.4);
     }
 
-    // ---- LSS (Lineup Synergy Score) ----
-    const fgDiff = fgPct - teamLeagueAvg.fgPct;
-    const lss = clamp(50 + fgDiff * 500); // amplify small differences
-    const lssConfidence = tscConfidence;
+    // ---- LSS v2: Net Rating (not FG%) ----
+    const netRtgDiff = netRtg - teamAvg.netRtg;
+    const lss = clamp(50 + netRtgDiff * 4);
 
-    // ---- PTS (Predictive Team Score) ----
-    // Forward-looking: current trajectory (win%) + SOS remaining adjustment
-    const trajectoryScore = winPctScore;
-    const sosAdj = sosRemaining * 10; // positive SOS = harder remaining schedule
-    const pts = clamp(trajectoryScore * 0.60 + ltfi * 0.25 + (50 - sosAdj) * 0.15);
-    const ptsConfidence = clamp(Math.min(total / 50, 1), 0, 1);
+    // ---- PTS: Forward-looking ----
+    const sosAdj = num(ts.sos_remaining, sos) * 10;
+    const pts = clamp(winPctScore * 0.55 + ltfi * 0.30 + (50 - sosAdj) * 0.15);
 
-    // ---- RP (Roster Penalty) ----
-    const injuries = injuryByTeam[teamId] || 0;
-    // Also check for low-GP players as proxy for missed time
-    const lowGPPlayers = (bisScoresByTeam[teamId] || []).length;
-    const rosterSize = rosterRows.filter(r => r.team_id === teamId).length || 15;
-    const missingPenalty = injuries * 5; // 5 points per injured player
-    const rp = clamp(100 - missingPenalty);
+    // ---- RP v2: BIS-weighted injury impact ----
+    const injImpact = injuryImpact[teamId] || { totalBis: 0, count: 0 };
+    // Higher BIS players being out = worse penalty
+    const bisPenalty = injImpact.totalBis * 0.4; // ~40 BIS star out = 16 point penalty
+    const rp = clamp(100 - bisPenalty);
 
-    // ---- DRS_Team ----
-    // Lower DRTG = better defense
-    const drtgDiff = teamLeagueAvg.drtg - drtg; // positive = better than average
+    // ---- DRS_Team: inverted DRTG ----
+    const drtgDiff = teamAvg.drtg - drtg;
     const drsTeam = clamp(50 + drtgDiff * 5);
-    const drsTeamStarDrop = 0; // Would need lineup data to compute properly
 
     await sql`
       INSERT INTO team_metric_snapshots (
@@ -602,40 +669,29 @@ async function main() {
         drs_team_score, drs_team_star_drop, drs_team_components
       ) VALUES (
         ${teamId}, ${seasonId}, NOW(), ${asOfDate},
-        ${Math.round(tsc * 100) / 100}, ${Math.round(tscConfidence * 100) / 100},
-        ${JSON.stringify({ winPct: winPctScore, topBIS: avgTopBIS, depth: depthScore })},
+        ${Math.round(tsc * 100) / 100}, ${clamp(Math.min((w + l) / 40, 1), 0, 1)},
+        ${JSON.stringify({ winPct: winPctScore, weightedBIS, depth: depthScore })},
         ${Math.round(ltfi * 100) / 100},
         ${JSON.stringify({ gamesUsed: tGames.length })},
-        ${JSON.stringify({ recentWins: tGames.filter(g => g.won).length, recentGames: tGames.length })},
-        ${Math.round(lss * 100) / 100}, ${Math.round(lssConfidence * 100) / 100},
-        ${JSON.stringify({ fgPctDiff: fgDiff })},
-        ${Math.round(pts * 100) / 100}, ${Math.round(ptsConfidence * 100) / 100},
-        ${JSON.stringify({ trajectory: trajectoryScore, ltfi, sosAdj })},
+        ${JSON.stringify({ recentGames: tGames.length, sosAdjusted: true })},
+        ${Math.round(lss * 100) / 100}, ${clamp(Math.min((w + l) / 40, 1), 0, 1)},
+        ${JSON.stringify({ netRtg, leagueAvg: teamAvg.netRtg })},
+        ${Math.round(pts * 100) / 100}, ${clamp(Math.min((w + l) / 50, 1), 0, 1)},
+        ${JSON.stringify({ trajectory: winPctScore, ltfi, sosAdj })},
         ${Math.round(rp * 100) / 100},
-        ${JSON.stringify({ injuries, missingPenalty })},
-        ${Math.round(drsTeam * 100) / 100}, ${drsTeamStarDrop},
-        ${JSON.stringify({ drtg, leagueAvg: teamLeagueAvg.drtg, diff: drtgDiff })}
+        ${JSON.stringify({ injuredPlayers: injImpact.count, bisLost: injImpact.totalBis })},
+        ${Math.round(drsTeam * 100) / 100}, ${0},
+        ${JSON.stringify({ drtg, leagueAvg: teamAvg.drtg, diff: drtgDiff })}
       )
       ON CONFLICT (team_id, season_id)
       DO UPDATE SET
         computed_at = NOW(),
-        tsc_score = EXCLUDED.tsc_score,
-        tsc_confidence = EXCLUDED.tsc_confidence,
-        tsc_components = EXCLUDED.tsc_components,
-        ltfi_score = EXCLUDED.ltfi_score,
-        ltfi_windows = EXCLUDED.ltfi_windows,
-        ltfi_components = EXCLUDED.ltfi_components,
-        lss_score = EXCLUDED.lss_score,
-        lss_confidence = EXCLUDED.lss_confidence,
-        lss_components = EXCLUDED.lss_components,
-        pts_score = EXCLUDED.pts_score,
-        pts_confidence = EXCLUDED.pts_confidence,
-        pts_components = EXCLUDED.pts_components,
-        rp_score = EXCLUDED.rp_score,
-        rp_penalties = EXCLUDED.rp_penalties,
-        drs_team_score = EXCLUDED.drs_team_score,
-        drs_team_star_drop = EXCLUDED.drs_team_star_drop,
-        drs_team_components = EXCLUDED.drs_team_components
+        tsc_score = EXCLUDED.tsc_score, tsc_confidence = EXCLUDED.tsc_confidence, tsc_components = EXCLUDED.tsc_components,
+        ltfi_score = EXCLUDED.ltfi_score, ltfi_windows = EXCLUDED.ltfi_windows, ltfi_components = EXCLUDED.ltfi_components,
+        lss_score = EXCLUDED.lss_score, lss_confidence = EXCLUDED.lss_confidence, lss_components = EXCLUDED.lss_components,
+        pts_score = EXCLUDED.pts_score, pts_confidence = EXCLUDED.pts_confidence, pts_components = EXCLUDED.pts_components,
+        rp_score = EXCLUDED.rp_score, rp_penalties = EXCLUDED.rp_penalties,
+        drs_team_score = EXCLUDED.drs_team_score, drs_team_star_drop = EXCLUDED.drs_team_star_drop, drs_team_components = EXCLUDED.drs_team_components
     `;
     teamCount++;
   }
@@ -651,11 +707,21 @@ async function main() {
   console.log(`Teams computed:   ${teamCount}`);
 
   if (playerMetrics.length > 0) {
-    const topBIS = [...playerMetrics].sort((a, b) => b.bis - a.bis).slice(0, 5);
-    console.log("\nTop 5 BIS scores:");
+    const topBIS = [...playerMetrics].sort((a, b) => b.bis - a.bis).slice(0, 10);
+    console.log("\nTop 10 BIS (v2):");
     for (const pm of topBIS) {
       const ps = playerStats.find(p => p.player_id === pm.playerId);
-      console.log(`  ${ps?.full_name || pm.playerId}: ${pm.bis.toFixed(2)}`);
+      console.log(`  ${(ps?.full_name || "???").padEnd(25)} BIS: ${pm.bis.toFixed(1).padStart(5)}  DRS: ${pm.drs.toFixed(1).padStart(5)}  OIQ: ${pm.rda.toFixed(1).padStart(5)}  LFI: ${pm.lfi.toFixed(1).padStart(5)}  PEM: ${pm.sps.toFixed(1).padStart(5)}  GOI: ${pm.goi.toFixed(1).padStart(5)}`);
+    }
+
+    console.log("\nTop 10 DRS (Defenders):");
+    const topDRS = [...playerMetrics].filter(p => {
+      const ps = playerStats.find(s => s.player_id === p.playerId);
+      return num(ps?.mpg) > 20;
+    }).sort((a, b) => b.drs - a.drs).slice(0, 10);
+    for (const pm of topDRS) {
+      const ps = playerStats.find(p => p.player_id === pm.playerId);
+      console.log(`  ${(ps?.full_name || "???").padEnd(25)} DRS: ${pm.drs.toFixed(1).padStart(5)}  ${pm.drsLabel}`);
     }
   }
 
