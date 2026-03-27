@@ -24,9 +24,13 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const activeDate = requestedDate || latestDate || "";
   let games = activeDate ? ((await getGamesByDateWithProjections(activeDate)) as any[]) : [];
 
-  // For today's games, overlay live scores from NBA CDN so they match the ticker
+  // Overlay live scores from NBA CDN so game cards match the ticker
+  // Only fetch for recent dates (today/yesterday) — CDN only has today's games
+  // but this ensures we always try to get fresh scores for recent games
   const todayStr = new Date().toISOString().slice(0, 10);
-  if (activeDate === todayStr && games.length > 0) {
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const isRecent = activeDate === todayStr || activeDate === yesterdayStr;
+  if (isRecent && games.length > 0) {
     try {
       const liveResp = await fetch(
         "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
@@ -49,13 +53,24 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
             status,
           });
         }
-        // Overlay onto DB games
+        // Overlay onto DB games + update DB in background
         for (const game of games) {
           const live = liveMap.get(game.external_id);
           if (live && (live.status === "final" || live.status === "live")) {
+            // Update the in-memory game object for this render
             game.home_score = live.homeScore;
             game.away_score = live.awayScore;
             game.status = live.status;
+            // Also update DB so future loads don't need CDN
+            try {
+              const { db: dbInst } = await import("@/lib/db");
+              const { sql: sqlTag } = await import("drizzle-orm");
+              await dbInst.execute(sqlTag`
+                UPDATE games SET home_score = ${live.homeScore}, away_score = ${live.awayScore},
+                  status = ${live.status}, updated_at = NOW()
+                WHERE external_id = ${game.external_id} AND status != 'final'
+              `);
+            } catch {}
           }
         }
       }
