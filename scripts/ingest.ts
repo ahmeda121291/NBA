@@ -346,7 +346,12 @@ async function ingestGames(seasonId: number): Promise<void> {
     const gameDate = String(homeEntry.GAME_DATE).slice(0, 10);
     const homePts = homeEntry.PTS != null ? Number(homeEntry.PTS) : null;
     const awayPts = awayEntry.PTS != null ? Number(awayEntry.PTS) : null;
-    const status = homePts != null && awayPts != null ? "final" : "scheduled";
+
+    // Don't mark today's or future games as "final" just because they have scores
+    // The leaguegamefinder API returns live game scores too
+    const today = new Date().toISOString().slice(0, 10);
+    const isHistorical = gameDate < today;
+    const status = (homePts != null && awayPts != null && isHistorical) ? "final" : "scheduled";
 
     await sql`
       INSERT INTO games (external_id, season_id, game_date, home_team_id, away_team_id,
@@ -354,8 +359,14 @@ async function ingestGames(seasonId: number): Promise<void> {
       VALUES (${gameId}, ${seasonId}, ${gameDate}, ${homeTid}, ${awayTid},
         ${status}, ${homePts}, ${awayPts})
       ON CONFLICT (external_id) DO UPDATE SET
-        status = EXCLUDED.status, home_score = EXCLUDED.home_score,
-        away_score = EXCLUDED.away_score, updated_at = NOW()
+        status = CASE
+          WHEN games.status = 'live' THEN games.status
+          WHEN EXCLUDED.status = 'final' THEN 'final'
+          ELSE games.status
+        END,
+        home_score = COALESCE(EXCLUDED.home_score, games.home_score),
+        away_score = COALESCE(EXCLUDED.away_score, games.away_score),
+        updated_at = NOW()
     `;
     count++;
   }
