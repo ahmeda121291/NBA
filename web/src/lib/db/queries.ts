@@ -666,7 +666,7 @@ export async function getTodaysGamesWithProjections() {
   // Try today first, fallback to most recent date with games
   let rows = await db.execute(sql`
     SELECT
-      g.id, g.game_date, g.status, g.home_score, g.away_score,
+      g.id, g.game_date, g.game_time, g.status, g.home_score, g.away_score,
       ht.abbreviation AS home_abbr, ht.nickname AS home_name,
       at.abbreviation AS away_abbr, at.nickname AS away_name,
       hts.wins AS home_wins, hts.losses AS home_losses,
@@ -695,7 +695,7 @@ export async function getTodaysGamesWithProjections() {
     if (recent) {
       rows = await db.execute(sql`
         SELECT
-          g.id, g.game_date, g.status, g.home_score, g.away_score,
+          g.id, g.game_date, g.game_time, g.status, g.home_score, g.away_score,
           ht.abbreviation AS home_abbr, ht.nickname AS home_name,
           at.abbreviation AS away_abbr, at.nickname AS away_name,
           hts.wins AS home_wins, hts.losses AS home_losses,
@@ -740,6 +740,34 @@ export async function getBiggestMovers(limit = 10) {
     LIMIT ${limit}
   `);
   return rows;
+}
+
+/** Get current key injuries (BIS 70+) grouped by team abbreviation */
+export async function getKeyInjuriesByTeam() {
+  const rows = await db.execute(sql`
+    SELECT
+      t.abbreviation AS team_abbr,
+      p.full_name,
+      pi.status AS injury_status,
+      pi.injury_type,
+      pms.bis_score
+    FROM player_injuries pi
+    JOIN players p ON pi.player_id = p.id
+    JOIN teams t ON pi.team_id = t.id
+    LEFT JOIN player_metric_snapshots pms ON pms.player_id = p.id
+    WHERE pi.is_current = true
+      AND pi.status IN ('Out', 'Doubtful')
+      AND pms.bis_score >= 70
+    ORDER BY pms.bis_score DESC
+  `);
+  // Group by team_abbr
+  const map: Record<string, { full_name: string; bis_score: number; injury_status: string }[]> = {};
+  for (const r of rows as any[]) {
+    const abbr = r.team_abbr;
+    if (!map[abbr]) map[abbr] = [];
+    map[abbr].push({ full_name: r.full_name, bis_score: Number(r.bis_score), injury_status: r.injury_status });
+  }
+  return map;
 }
 
 /** Get all players with full stats + metrics (for DataTable) */

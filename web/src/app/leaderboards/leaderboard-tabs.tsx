@@ -48,6 +48,15 @@ export function LeaderboardTabs({ players }: Props) {
     const g = searchParams.get("minGP");
     return g != null ? Number(g) : 20;
   });
+
+  // Persist minGP in URL on mount if not already present
+  useState(() => {
+    if (!searchParams.has("minGP")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("minGP", "20");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  });
   const [showCount, setShowCount] = useState(25);
 
   const scoreKey = `${activeTab}_score`;
@@ -83,7 +92,9 @@ export function LeaderboardTabs({ players }: Props) {
               }`}
             >
               <Icon className="h-3 w-3" />
-              <MetricTooltip metricKey={tab.key}>{tab.label}</MetricTooltip>
+              <MetricTooltip metricKey={tab.key}>
+                <span>{tab.label}<span className="hidden sm:inline"> — {tab.fullName.split(" ").slice(0, 2).join(" ")}</span></span>
+              </MetricTooltip>
             </button>
           );
         })}
@@ -123,7 +134,7 @@ export function LeaderboardTabs({ players }: Props) {
           {minGamesOptions.map((g) => (
             <button
               key={g}
-              onClick={() => { setMinGames(g); updateUrl({ minGP: g === 20 ? null : String(g) }); }}
+              onClick={() => { setMinGames(g); updateUrl({ minGP: String(g) }); }}
               className={`px-1.5 py-0.5 text-[10px] font-stat transition-all rounded-sm ${
                 minGames === g
                   ? "text-indigo-400 bg-[rgba(129,140,248,0.08)]"

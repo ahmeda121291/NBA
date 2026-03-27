@@ -37,12 +37,31 @@ interface ScoutingReport {
   projectionNote: string | null; // "If X improves, BIS projects to Y"
 }
 
-function tier(score: number): "elite" | "great" | "good" | "average" | "below" {
+function tier(score: number): "elite" | "very_good" | "solid" | "below_avg" | "poor" {
+  if (score >= 80) return "elite";       // dominant / league-leading
+  if (score >= 65) return "very_good";   // high-level / above average
+  if (score >= 50) return "solid";       // capable / average
+  if (score >= 35) return "below_avg";   // limited / developing
+  return "poor";                         // weak / significant weakness
+}
+
+function tierLabel(score: number): string {
   if (score >= 80) return "elite";
-  if (score >= 65) return "great";
-  if (score >= 50) return "good";
-  if (score >= 35) return "average";
-  return "below";
+  if (score >= 65) return "above-average";
+  if (score >= 50) return "average";
+  if (score >= 35) return "below-average";
+  return "poor";
+}
+
+function percentilePhrase(score: number): string {
+  if (score >= 95) return "top 5% of the league";
+  if (score >= 90) return "top 10% of the league";
+  if (score >= 80) return "top 20% of the league";
+  if (score >= 65) return "well above league average";
+  if (score >= 50) return "right around league average";
+  if (score >= 35) return "below league average";
+  if (score >= 20) return "bottom quartile of the league";
+  return "among the weakest in the league";
 }
 
 function posLabel(pos: string): string {
@@ -290,21 +309,21 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
   // === HEADLINE — more specific, less generic ===
   let headline = "";
   if (bisTier === "elite" && ppg >= 25) {
-    headline = `${p.full_name} is a franchise cornerstone — ${ppg.toFixed(0)} PPG with an elite BIS of ${bis.toFixed(0)}`;
+    headline = `${p.full_name} is a franchise cornerstone — ${ppg.toFixed(0)} PPG with a dominant BIS of ${bis.toFixed(0)} (${percentilePhrase(bis)})`;
   } else if (bisTier === "elite") {
-    headline = `${p.full_name} is one of the league's most impactful players — BIS ${bis.toFixed(0)} (top ${p.bis_percentile ? Number(p.bis_percentile).toFixed(0) + "th percentile" : "tier"})`;
-  } else if (bisTier === "great" && scores.drs && scores.drs >= 70) {
-    headline = `${p.full_name} is a two-way force — ${ppg.toFixed(0)}/${rpg.toFixed(0)}/${apg.toFixed(0)} with elite defense`;
-  } else if (bisTier === "great") {
-    headline = `${p.full_name} is a high-impact ${posArchetype(p.position)} — BIS ${bis.toFixed(0)}`;
-  } else if (bisTier === "good" && scores.lfi && scores.lfi >= 70) {
-    headline = `${p.full_name} is surging — BIS ${bis.toFixed(0)} with elite recent form`;
-  } else if (bisTier === "good") {
-    headline = `${p.full_name} is a quality ${posArchetype(p.position)} with room to grow — BIS ${bis.toFixed(0)}`;
-  } else if (bisTier === "average") {
-    headline = `${p.full_name} fills a niche for ${p.team_abbr} but impact is limited — BIS ${bis.toFixed(0)}`;
+    headline = `${p.full_name} is one of the league's most impactful players — BIS ${bis.toFixed(0)} (${p.bis_percentile ? "top " + (100 - Number(p.bis_percentile)).toFixed(0) + "%" : percentilePhrase(bis)})`;
+  } else if (bisTier === "very_good" && scores.drs && scores.drs >= 70) {
+    headline = `${p.full_name} is a high-level two-way force — ${ppg.toFixed(0)}/${rpg.toFixed(0)}/${apg.toFixed(0)} with league-leading defense (DRS ${scores.drs.toFixed(0)})`;
+  } else if (bisTier === "very_good") {
+    headline = `${p.full_name} is an above-average ${posArchetype(p.position)} — BIS ${bis.toFixed(0)} puts him ${percentilePhrase(bis)}`;
+  } else if (bisTier === "solid" && scores.lfi && scores.lfi >= 70) {
+    headline = `${p.full_name} is surging — BIS ${bis.toFixed(0)} with elite recent form (LFI ${scores.lfi.toFixed(0)})`;
+  } else if (bisTier === "solid") {
+    headline = `${p.full_name} is a capable ${posArchetype(p.position)} with room to grow — BIS ${bis.toFixed(0)}`;
+  } else if (bisTier === "below_avg") {
+    headline = `${p.full_name} is a limited contributor for ${p.team_abbr} — BIS ${bis.toFixed(0)} ranks ${percentilePhrase(bis)}`;
   } else {
-    headline = `${p.full_name} is struggling to find impact this season — BIS ${bis.toFixed(0)}`;
+    headline = `${p.full_name} is a significant weakness this season — BIS ${bis.toFixed(0)} places him ${percentilePhrase(bis)}`;
   }
 
   const sections: { title: string; content: string }[] = [];
@@ -318,16 +337,16 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
 
   // Add the "so what" — what makes this player interesting
   if (bisTier === "elite" && scores.lfi && scores.lfi >= 65) {
-    summary += ` Both his established baseline and current trajectory are elite — he's playing the best basketball of the season and the form is verified.`;
+    summary += ` Both his established baseline and current trajectory are dominant — he's performing in the ${percentilePhrase(bis)} and the form (LFI ${scores.lfi.toFixed(0)}) is verified. This is MVP-caliber basketball.`;
     tags.push("MVP Caliber");
   } else if (bis >= 65 && scores.drs && scores.drs < 35) {
-    summary += ` The offensive production is high-end, but defensive limitations create a ceiling on his overall impact — he gives back on one end what he creates on the other.`;
+    summary += ` The offensive production is high-level, but his defensive weakness (DRS ${scores.drs.toFixed(0)}, ${percentilePhrase(scores.drs)}) creates a hard ceiling — he gives back on one end what he creates on the other.`;
     tags.push("Offense Only");
   } else if (bis < 50 && scores.lfi && scores.lfi >= 70) {
-    summary += ` His season baseline is modest, but recent form has been dramatically better — either a breakout is happening or this is a hot stretch that will cool.`;
+    summary += ` His season baseline is limited (BIS ${bis.toFixed(0)}), but recent form has been dramatically better (LFI ${scores.lfi.toFixed(0)}) — either a breakout is happening or this is a hot stretch that will cool.`;
     tags.push("Breakout Watch");
   } else if (bis >= 60 && scores.lfi && scores.lfi < 35) {
-    summary += ` His established talent level is clear, but current form is concerning. This disconnect suggests fatigue, injury, or tactical changes worth investigating.`;
+    summary += ` His established talent level is above-average (BIS ${bis.toFixed(0)}), but current form is poor (LFI ${scores.lfi.toFixed(0)}). This disconnect suggests fatigue, injury, or tactical changes worth investigating.`;
     tags.push("Buy Low?");
   }
   sections.push({ title: "Executive Summary", content: summary });
@@ -335,13 +354,13 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
   // === 2. CURRENT FORM ===
   if (scores.lfi !== null) {
     const lfi = scores.lfi!;
-    let form = `Live Form Index: ${lfi.toFixed(0)}/100.`;
+    let form = `Live Form Index: ${lfi.toFixed(0)} — ${tierLabel(lfi)} recent performance, ranking ${percentilePhrase(lfi)}.`;
     const streakText = streakNarrative(p.lfi_streak_label, lfiDelta, firstName, bis);
     if (streakText) {
       form += ` ${streakText}`;
     } else if (lfiDelta !== 0) {
       const dir = lfiDelta > 0 ? "trending up" : "trending down";
-      form += ` Form is ${dir} — LFI has shifted ${lfiDelta > 0 ? "+" : ""}${Math.abs(lfiDelta).toFixed(1)} points from last snapshot.`;
+      form += ` Form is ${dir} — LFI has shifted ${lfiDelta > 0 ? "+" : ""}${Math.abs(lfiDelta).toFixed(1)} points from last snapshot. ${lfiDelta > 0 ? "The trajectory suggests sustained improvement rather than noise." : "This decline may reflect fatigue, lineup changes, or tougher recent matchups."}`;
     }
 
     // Actionable context
@@ -358,15 +377,29 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
   // === 3. SCORING & SHOOTING (zone-specific) ===
   const shootingText = shootingAnalysis(p);
   if (shootingText) {
-    // Add scoring context
+    // Add scoring context with metric references
     let scoringContext = "";
     if (ppg >= 25 && scores.rda && scores.rda >= 70) {
-      scoringContext = `${firstName} shoulders a massive scoring load as the primary option — ${ppg.toFixed(1)} PPG with a high-difficulty shot diet. `;
+      scoringContext = `${firstName}'s offensive production (OIQ ${scores.rda.toFixed(0)}) is historically dominant — he shoulders a massive scoring load as the primary option at ${ppg.toFixed(1)} PPG with a high-difficulty shot diet, forcing defenses into impossible pick-your-poison situations. `;
       tags.push("Alpha Scorer");
+    } else if (ppg >= 20 && scores.rda) {
+      scoringContext = `Averaging ${ppg.toFixed(1)} points per game as a core scorer. His offensive burden (OIQ ${scores.rda.toFixed(0)}) ranks ${percentilePhrase(scores.rda)}, meaning ${scores.rda >= 65 ? "he creates most of his own looks under duress" : scores.rda >= 50 ? "he handles a moderate creation load" : "much of his scoring comes from system-generated looks"}. `;
     } else if (ppg >= 20) {
       scoringContext = `Averaging ${ppg.toFixed(1)} points per game as a core scorer. `;
+    } else if (ppg >= 12 && scores.rda) {
+      scoringContext = `Provides ${ppg.toFixed(1)} PPG as a secondary scoring option (OIQ ${scores.rda.toFixed(0)}). ${scores.rda >= 60 ? "He creates at a level above his usage — there may be untapped upside if given more touches." : "His scoring mostly flows from the system rather than self-creation."} `;
     } else if (ppg >= 12) {
       scoringContext = `Provides ${ppg.toFixed(1)} PPG as a secondary scoring option. `;
+    }
+
+    // Add SPS/PEM context if available
+    if (scores.sps !== null) {
+      const sps = scores.sps!;
+      if (sps >= 70) {
+        scoringContext += `His playmaking efficiency (PEM ${sps.toFixed(0)}) is ${tierLabel(sps)} — he makes teammates measurably better, and his value transfers across different lineups and contexts. `;
+      } else if (sps < 35) {
+        scoringContext += `His playmaking efficiency (PEM ${sps.toFixed(0)}) is a limitation — his value is context-dependent and drops when the supporting cast changes. `;
+      }
     }
     sections.push({ title: "Scoring & Shot Profile", content: scoringContext + shootingText });
   }
@@ -379,27 +412,29 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
 
   // === 5. DEFENSIVE SCOUTING REPORT ===
   if (scores.drs !== null) {
-    const defText = defensiveAnalysis(p, scores.drs!);
+    const drsVal = scores.drs!;
+    let defHeader = `Defensive Reality Score (DRS ${drsVal.toFixed(0)}) ranks ${percentilePhrase(drsVal)} among ${posLabel(p.position)}s. `;
+    const defText = defensiveAnalysis(p, drsVal);
     if (defText) {
-      if (scores.drs! >= 70) tags.push("Elite Defender");
-      else if (scores.drs! < 35) tags.push("Defensive Liability");
-      sections.push({ title: "Defensive Scouting Report", content: defText });
+      if (drsVal >= 70) tags.push("Elite Defender");
+      else if (drsVal < 35) tags.push("Defensive Liability");
+      sections.push({ title: "Defensive Scouting Report", content: defHeader + defText });
     }
   }
 
   // === 6. OFF-BALL VALUE & GRAVITY ===
   if (scores.goi !== null) {
     const goi = scores.goi!;
-    let offball = `Off-Ball Impact Score: ${goi.toFixed(0)}/100. `;
+    let offball = `Gravity & Off-Ball Impact (GOI ${goi.toFixed(0)}) ranks ${percentilePhrase(goi)} among ${posLabel(p.position)}s. `;
     if (goi >= 75 && Number(p.fg3_pct) * 100 >= 36) {
-      offball += `${firstName} is a gravitational force off the ball — his shooting threat pulls defenders out of help position, creating driving lanes and cutting opportunities for teammates. His value extends far beyond the box score.`;
+      offball += `${firstName} is a gravitational force off the ball — his shooting threat pulls defenders out of help position, creating driving lanes and cutting opportunities for teammates. The consequence: his team's offensive rating jumps even in possessions where he never touches the ball.`;
       tags.push("Gravity");
     } else if (goi >= 60) {
-      offball += `Contributes meaningful off-ball value through cutting, screening actions, and movement. Doesn't need the ball to positively impact the offense.`;
+      offball += `He contributes meaningful off-ball value through cutting, screening actions, and movement. The result is that ${firstName} doesn't need the ball to positively impact the offense — lineups with him space the floor better than his usage numbers suggest.`;
     } else if (goi < 35 && ppg >= 15) {
-      offball += `Limited off-ball impact despite high usage when he has the ball. ${firstName} tends to stand and watch when not directly involved in the action — adding off-ball movement and screening effort would raise his total impact.`;
+      offball += `This is a significant limitation despite high on-ball usage — ${firstName} tends to stand and watch when not directly involved in the action. The consequence: the offense essentially plays 4-on-5 when the ball isn't in his hands, reducing overall team efficiency.`;
     } else if (goi < 35) {
-      offball += `Minimal off-ball presence. Doesn't command attention from defenses when he doesn't have the basketball.`;
+      offball += `Minimal off-ball presence means defenses ignore him when he doesn't have the basketball, allowing them to load up help defense on ${firstName}'s teammates.`;
     }
     sections.push({ title: "Off-Ball Value", content: offball });
   }
@@ -412,7 +447,7 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
     improvements.push(`Three-point shooting (${fg3.toFixed(0)}%) is the #1 unlock. Getting to 35-36% would transform his offensive gravity and open up driving lanes.`);
   }
   if (scores.drs && scores.drs < 40 && bis >= 55) {
-    improvements.push(`Defensive improvement would be transformational. Going from a DRS of ${scores.drs.toFixed(0)} to even 55 would push him into All-Star conversation.`);
+    improvements.push(`Defensive improvement (DRS ${scores.drs.toFixed(0)}, ${percentilePhrase(scores.drs)}) would be transformational. Raising DRS to even 55 would push him into All-Star conversation — the gap between his offense and defense is the single biggest constraint on his value.`);
   }
   if (Number(p.topg) >= 3.5 && ppg < 24) {
     improvements.push(`Ball security — ${Number(p.topg).toFixed(1)} turnovers per game is too high for his role. Tighter decisions in traffic would add 2-3 net points of impact.`);
@@ -431,24 +466,61 @@ export function generateScoutingReport(player: PlayerData): ScoutingReport {
     sections.push({ title: "Development Priorities", content: improvements.join(" ") });
   }
 
-  // === 8. BOTTOM LINE (specific, not generic) ===
+  // === 8. KEY MATCHUP INSIGHT ===
+  {
+    const matchupParts: string[] = [];
+    const oiq = scores.rda;   // Offensive Impact Quotient
+    const pem = scores.sps;   // Playmaking Efficiency Metric
+    const drs = scores.drs;   // Defensive Reality Score
+    const goi = scores.goi;
+
+    // Determine player archetype from metric profile
+    const isDefensiveSpecialist = drs !== null && drs >= 65 && (oiq === null || oiq < 50);
+    const isFacilitator = pem !== null && pem >= 65 && (oiq === null || oiq < 55);
+    const isScorerOnly = oiq !== null && oiq >= 65 && (drs === null || drs < 40);
+    const isTwoWayStar = oiq !== null && oiq >= 65 && drs !== null && drs >= 65;
+    const isGravityPlayer = goi !== null && goi >= 70 && Number(p.fg3_pct) * 100 >= 36;
+
+    if (isTwoWayStar) {
+      matchupParts.push(`${firstName} is matchup-proof — elite offense (OIQ ${oiq!.toFixed(0)}) combined with elite defense (DRS ${drs!.toFixed(0)}) means there's no scheme that neutralizes him. Against top defenses, he maintains production while simultaneously disrupting the opponent's best players.`);
+    } else if (isScorerOnly) {
+      matchupParts.push(`Against elite defenses (DRS 75+), ${firstName}'s scoring typically drops 15-20% from his baseline because his defensive weakness (DRS ${drs ? drs.toFixed(0) : "N/A"}) forces coaches into net-negative lineup math. In those matchups, he's a high-volume scorer who gets hunted on the other end — his team must outscore the problem.`);
+    } else if (isDefensiveSpecialist) {
+      matchupParts.push(`${firstName}'s value peaks in playoff-style matchups against high-usage scorers. His defense (DRS ${drs!.toFixed(0)}) is his calling card, but limited offensive creation (OIQ ${oiq ? oiq.toFixed(0) : "N/A"}) means his team needs other shot-creators around him. He's the perfect 3rd or 4th option on a contender, not a lead.`);
+    } else if (isFacilitator) {
+      matchupParts.push(`${firstName}'s value shifts in tough matchups — against elite defenses, his scoring may dip, but his playmaking efficiency (PEM ${pem!.toFixed(0)}) ensures he still creates value through ball movement and teammate involvement. He's the connective tissue that keeps an offense functional when individual scoring gets harder.`);
+    } else if (isGravityPlayer) {
+      matchupParts.push(`${firstName}'s off-ball gravity (GOI ${goi!.toFixed(0)}) makes him uniquely valuable in playoff matchups where half-court execution matters most. His shooting threat forces defenses to account for him even without the ball, opening up actions for primary creators.`);
+    } else if (bis >= 50 && bis < 65) {
+      // Average players — give a general matchup note
+      if (ppg >= 15 && (drs === null || drs < 50)) {
+        matchupParts.push(`In matchups against top-tier competition, ${firstName}'s production tends to compress toward his floor rather than his ceiling. His average overall profile (BIS ${bis.toFixed(0)}) means he's scheme-dependent — he'll look good in favorable matchups and disappear in tough ones.`);
+      }
+    }
+
+    if (matchupParts.length > 0) {
+      sections.push({ title: "Key Matchup Insight", content: matchupParts.join(" ") });
+    }
+  }
+
+  // === 9. BOTTOM LINE (specific, not generic) ===
   let bottom = "";
   if (bisTier === "elite" && scores.lfi && scores.lfi >= 60) {
-    bottom = `${p.full_name} is a franchise-caliber talent operating at peak level. The combination of baseline excellence and current form makes him one of the most dangerous players in basketball right now. Any team built around ${firstName} has legitimate championship equity.`;
+    bottom = `${p.full_name} is a franchise-caliber talent operating at peak level (BIS ${bis.toFixed(0)}, LFI ${scores.lfi.toFixed(0)}). The combination of dominant baseline and verified current form makes him one of the most dangerous players in basketball right now. Any team built around ${firstName} has legitimate championship equity.`;
   } else if (bisTier === "elite" && scores.lfi && scores.lfi < 45) {
-    bottom = `${firstName}'s talent base is elite, but current form is dipping. This creates a buy-low window — the underlying skills haven't diminished, and regression to his mean is likely. Bet on the baseline, not the slump.`;
-  } else if (bisTier === "great" && improvements.length <= 1) {
-    bottom = `${firstName} is a near-complete player at the ${posLabel(p.position)} position. He's a clear-cut starter on a contender and provides impact across multiple dimensions. The gap between "great" and "elite" is narrow for him.`;
-  } else if (bisTier === "great") {
-    bottom = `${firstName} is a high-quality starter who makes his team meaningfully better. With ${improvements.length} clear development areas identified, there's a realistic path to All-Star level if the improvements come.`;
-  } else if (bisTier === "good" && scores.lfi && scores.lfi >= 65) {
-    bottom = `${firstName} is playing above his season baseline and looks like a player on the rise. If the recent form proves sustainable, he's on trajectory to be a notable contributor for the ${p.team_name}.`;
-  } else if (bisTier === "good") {
-    bottom = `${firstName} is a solid rotation player — you know what you're getting. The upside depends on whether the identified development areas improve or plateau.`;
-  } else if (bisTier === "average") {
-    bottom = `${firstName} fills a specific niche for the ${p.team_name}. His value is real but limited in scope — a complementary piece, not a building block.`;
+    bottom = `${firstName}'s talent base is league-leading (BIS ${bis.toFixed(0)}), but current form is poor (LFI ${scores.lfi.toFixed(0)}). This creates a buy-low window — the underlying skills haven't diminished, and regression to his dominant mean is likely. Bet on the baseline, not the slump.`;
+  } else if (bisTier === "very_good" && improvements.length <= 1) {
+    bottom = `${firstName} is a near-complete player at the ${posLabel(p.position)} position (BIS ${bis.toFixed(0)}, ${percentilePhrase(bis)}). He's a clear-cut starter on a contender and provides above-average impact across multiple dimensions. The gap between high-level and elite is narrow for him.`;
+  } else if (bisTier === "very_good") {
+    bottom = `${firstName} is a high-level starter who makes his team meaningfully better (BIS ${bis.toFixed(0)}). With ${improvements.length} clear development areas identified, there's a realistic path to elite status if the improvements come.`;
+  } else if (bisTier === "solid" && scores.lfi && scores.lfi >= 65) {
+    bottom = `${firstName} is playing above his season baseline (BIS ${bis.toFixed(0)}) with above-average recent form (LFI ${scores.lfi.toFixed(0)}). If the trajectory holds, he's on a path from capable rotation player to legitimate starter.`;
+  } else if (bisTier === "solid") {
+    bottom = `${firstName} is a capable rotation player (BIS ${bis.toFixed(0)}) — you know what you're getting. Average production with clear upside if the identified development areas improve rather than plateau.`;
+  } else if (bisTier === "below_avg") {
+    bottom = `${firstName} fills a limited niche for the ${p.team_name} (BIS ${bis.toFixed(0)}, ${percentilePhrase(bis)}). His value is real but narrow — a developing piece who needs measurable improvement to hold a rotation spot on a contending team.`;
   } else {
-    bottom = `${firstName} is struggling for consistent impact this season. At BIS ${bis.toFixed(0)}, the production doesn't justify significant minutes on a competitive team. Either a role change or significant skill development is needed.`;
+    bottom = `${firstName} is a significant weakness this season. At BIS ${bis.toFixed(0)} (${percentilePhrase(bis)}), the production doesn't justify significant minutes on a competitive team. Either a role change or major skill development is needed to remain in the rotation.`;
   }
   sections.push({ title: "The Verdict", content: bottom });
 

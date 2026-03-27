@@ -40,7 +40,7 @@ function PlayerSearch({ onSelect, selected, slot, allPlayers }: {
       const q = query.toLowerCase();
       list = list.filter((p) => p.label.toLowerCase().includes(q));
     }
-    return list.slice(0, 15);
+    return list.slice(0, 30);
   }, [allPlayers, query, posFilter]);
 
   return (
@@ -137,6 +137,16 @@ function PlayerSearch({ onSelect, selected, slot, allPlayers }: {
         </div>
       )}
     </GlassCard>
+  );
+}
+
+function EmptyCompareState() {
+  return (
+    <div className="text-center py-12">
+      <User className="h-10 w-10 text-text-muted/15 mx-auto mb-3" />
+      <p className="text-sm text-text-muted/50">Select two players to compare</p>
+      <p className="text-[11px] text-text-muted/30 mt-1.5">Try: Jokic vs Wembanyama, Brunson vs SGA, or Scottie vs Amen</p>
+    </div>
   );
 }
 
@@ -299,6 +309,8 @@ export default function ComparePage() {
         <PlayerSearch onSelect={(id) => loadPlayer(id, 1)} selected={player1} slot={1} allPlayers={allPlayers} />
         <PlayerSearch onSelect={(id) => loadPlayer(id, 2)} selected={player2} slot={2} allPlayers={allPlayers} />
       </div>
+
+      {!hasComparison && <EmptyCompareState />}
 
       {hasComparison && (
         <>

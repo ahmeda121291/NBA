@@ -11,32 +11,32 @@ export const METRIC_LABELS: Record<string, { name: string; description: string; 
   bis: {
     name: "Baseline Impact Score",
     short: "BIS",
-    description: "Stable estimate of overall player value using the strongest existing impact metrics.",
+    description: "Overall player value on a 0-99 scale. Combines offensive and defensive impact into a single number. 80+ is elite (top 20%), 50 is league average, below 35 is a significant weakness.",
   },
   rda: {
     name: "Offensive Impact Quotient",
     short: "OIQ",
-    description: "Measures how hard a player's offensive role is — separating easy-efficiency from high-burden creation.",
+    description: "How much offensive burden a player carries and how well he handles it. High OIQ means he creates difficult shots efficiently under pressure. Low OIQ means scoring comes from system-generated looks. 0-99 scale.",
   },
   goi: {
     name: "Gravity & Off-Ball Impact",
     short: "GOI",
-    description: "Estimates value created without the ball through spacing, movement, and ecosystem effects.",
+    description: "Value created without the ball — spacing, movement, cutting, and screen-setting. High GOI players make teammates better just by being on the court. Low GOI players become invisible off-ball. 0-99 scale.",
   },
   drs: {
     name: "Defensive Reality Score",
     short: "DRS",
-    description: "Estimates whether a player actually improves team defense, beyond steals and blocks.",
+    description: "Does this player actually improve team defense? Goes beyond steals and blocks to measure positioning, help defense, and scheme impact. 80+ is elite, below 35 is a defensive liability. 0-99 scale.",
   },
   sps: {
     name: "Playmaking Efficiency Metric",
     short: "PEM",
-    description: "Measures whether player value transfers across different contexts, roles, and lineups.",
+    description: "How well a player's value transfers across different lineups, roles, and contexts. High PEM means he elevates any group; low PEM means he's scheme-dependent and drops off with roster changes. 0-99 scale.",
   },
   lfi: {
     name: "Live Form Index",
     short: "LFI",
-    description: "Captures current form with noise filtering — what is actually happening right now.",
+    description: "What is this player doing right now? Captures recent performance with noise filtering to separate real trends from variance. 80+ means elite current form, below 35 means a cold stretch. 0-99 scale.",
   },
   mai: {
     name: "Matchup Advantage Index",

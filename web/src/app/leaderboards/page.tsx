@@ -27,6 +27,7 @@ export default async function LeaderboardsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight gradient-text">Leaderboards</h1>
         <p className="text-sm text-text-muted mt-1">CourtVision metric rankings — {CURRENT_SEASON} season</p>
+        <p className="text-[10px] text-text-muted/40 mt-1">Updated: {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
       </div>
 
       {/* Top 3 BIS Podium */}

@@ -14,9 +14,31 @@ export default async function StudioPage() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold tracking-tight gradient-text">CourtVision Studio</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Create shareable charts, comparison cards, and data visuals — download as PNG for Twitter/Instagram
+        <p className="text-text-muted mt-1">
+          Build shareable data visuals with CourtVision metrics. Compare players, visualize trends, and export publication-ready graphics.
         </p>
+      </div>
+
+      {/* Quick-start tips */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <GlassCard className="p-3">
+          <p className="text-xs font-semibold text-accent mb-1">Player Comparison</p>
+          <p className="text-xs text-text-muted">
+            Select 2-6 players and pick a chart type to compare BIS, shooting splits, or any metric side-by-side.
+          </p>
+        </GlassCard>
+        <GlassCard className="p-3">
+          <p className="text-xs font-semibold text-accent mb-1">Scatter Plots</p>
+          <p className="text-xs text-text-muted">
+            Map any two metrics on X/Y axes to find outliers, clusters, and positional trends across the league.
+          </p>
+        </GlassCard>
+        <GlassCard className="p-3">
+          <p className="text-xs font-semibold text-accent mb-1">Export & Share</p>
+          <p className="text-xs text-text-muted">
+            Every visual can be downloaded as a high-res PNG. Sized for Twitter, Instagram, or any social platform.
+          </p>
+        </GlassCard>
       </div>
 
       <StudioBuilder

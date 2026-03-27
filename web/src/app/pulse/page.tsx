@@ -6,6 +6,7 @@ import {
   getBiggestMovers,
   getHottestPlayers,
   getTodaysGamesWithProjections,
+  getKeyInjuriesByTeam,
 } from "@/lib/db/queries";
 import { TrendingUp, TrendingDown, Flame, Snowflake, Zap, Trophy, AlertTriangle } from "lucide-react";
 import { tierClass } from "@/lib/formatting";
@@ -13,10 +14,11 @@ import { tierClass } from "@/lib/formatting";
 export const dynamic = "force-dynamic";
 
 export default async function PulsePage() {
-  const [movers, hotPlayers, slateGames] = await Promise.all([
+  const [movers, hotPlayers, slateGames, keyInjuries] = await Promise.all([
     getBiggestMovers(12),
     getHottestPlayers(10),
     getTodaysGamesWithProjections(),
+    getKeyInjuriesByTeam(),
   ]);
 
   const moversData = movers as any[];
@@ -29,7 +31,7 @@ export default async function PulsePage() {
 
   // Hot and cold streaks
   const hotStreaks = hotData.filter((p) =>
-    p.lfi_streak_label === "hot_likely_real" || p.lfi_streak_label === "hot_fragile" || p.lfi_streak_label === "breakout_role_expansion"
+    p.lfi_streak_label === "hot_likely_real" || p.lfi_streak_label === "hot_fragile" || p.lfi_streak_label === "breakout_role_expansion" || p.lfi_streak_label === "hot_opponent_driven"
   ).slice(0, 5);
   const coldStreaks = hotData.length > 0
     ? (moversData.filter((p) => p.lfi_streak_label === "cold_real" || p.lfi_streak_label === "cold_bouncing_back").slice(0, 5))
@@ -69,6 +71,8 @@ export default async function PulsePage() {
               const homeProb = g.win_prob_home ? (Number(g.win_prob_home) * 100).toFixed(0) : null;
               const awayProb = g.win_prob_away ? (Number(g.win_prob_away) * 100).toFixed(0) : null;
               const isUpset = g.upset_risk === "high";
+              const homeInjuries = keyInjuries[g.home_abbr] ?? [];
+              const awayInjuries = keyInjuries[g.away_abbr] ?? [];
               return (
                 <a key={g.id} href={`/games/${g.id}`}>
                   <GlassCard hover className="relative overflow-hidden">
@@ -84,8 +88,13 @@ export default async function PulsePage() {
                           <Image src={getTeamLogoByAbbr(g.away_abbr)} alt={g.away_abbr} fill className="object-contain" unoptimized />
                         </div>
                         <div>
-                          <span className="text-sm font-bold">{g.away_abbr}</span>
-                          <span className="text-[10px] text-text-muted ml-1">({g.away_wins}-{g.away_losses})</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-bold">{g.away_abbr}</span>
+                            <span className="text-[10px] text-text-muted">({g.away_wins}-{g.away_losses})</span>
+                            {awayInjuries.length > 0 && (
+                              <span className="text-[7px] font-bold text-rose-400" title={awayInjuries.map((i: any) => `${i.full_name} (BIS ${i.bis_score})`).join(", ")}>⚠ KEY INJ</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="text-center">
@@ -98,8 +107,13 @@ export default async function PulsePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div>
-                          <span className="text-sm font-bold">{g.home_abbr}</span>
-                          <span className="text-[10px] text-text-muted ml-1">({g.home_wins}-{g.home_losses})</span>
+                          <div className="flex items-center gap-1">
+                            {homeInjuries.length > 0 && (
+                              <span className="text-[7px] font-bold text-rose-400" title={homeInjuries.map((i: any) => `${i.full_name} (BIS ${i.bis_score})`).join(", ")}>⚠ KEY INJ</span>
+                            )}
+                            <span className="text-sm font-bold">{g.home_abbr}</span>
+                            <span className="text-[10px] text-text-muted">({g.home_wins}-{g.home_losses})</span>
+                          </div>
                         </div>
                         <div className="relative h-6 w-6">
                           <Image src={getTeamLogoByAbbr(g.home_abbr)} alt={g.home_abbr} fill className="object-contain" unoptimized />
@@ -228,6 +242,7 @@ export default async function PulsePage() {
                 const streakMap: Record<string, { text: string; cls: string }> = {
                   hot_likely_real: { text: "VERIFIED HOT", cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
                   hot_fragile: { text: "HOT — FRAGILE", cls: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+                  hot_opponent_driven: { text: "OPP-DRIVEN", cls: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
                   breakout_role_expansion: { text: "BREAKOUT", cls: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
                 };
                 const badge = streakMap[p.lfi_streak_label] ?? { text: p.lfi_streak_label, cls: "text-text-muted" };
@@ -353,6 +368,11 @@ export default async function PulsePage() {
                         </span>
                       )}
                       {isFinal && <span className="text-[8px] text-text-muted/30 uppercase">Final</span>}
+                      {!isFinal && (
+                        <span className="text-[8px] text-text-muted/30">
+                          {g.game_time ? new Date(g.game_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "TBD"}
+                        </span>
+                      )}
                     </div>
                   </GlassCard>
                 </a>
