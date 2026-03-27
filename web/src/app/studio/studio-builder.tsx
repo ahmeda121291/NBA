@@ -481,19 +481,64 @@ export function StudioBuilder({ players, teams }: Props) {
               )}
             </div>
 
-            {/* Quick-add from filters */}
+            {/* Quick Presets */}
             {chartType !== "stat-card" && (
               <>
+                <div>
+                  <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1.5">Quick Add</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { label: "Top 10 BIS", fn: () => [...players].sort((a,b) => (b.bis??0) - (a.bis??0)).slice(0,10) },
+                      { label: "Top 10 Scorers", fn: () => [...players].sort((a,b) => b.ppg - a.ppg).slice(0,10) },
+                      { label: "Top 10 Defenders", fn: () => [...players].sort((a,b) => (b.drs??0) - (a.drs??0)).slice(0,10) },
+                      { label: "Top 10 Playmakers", fn: () => [...players].sort((a,b) => b.apg - a.apg).slice(0,10) },
+                      { label: "Rookies Only", fn: () => players.filter(p => p.draftYear === 2025 && p.gp >= 20).sort((a,b) => (b.bis??0) - (a.bis??0)).slice(0,15) },
+                      { label: "All Filtered", fn: () => getFilteredPlayers().slice(0, 50) },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setSelectedPlayers(preset.fn())}
+                        className="text-[10px] font-semibold text-indigo-400/80 hover:text-indigo-400 border border-indigo-500/15 rounded-lg px-2 py-1.5 hover:bg-indigo-500/10 transition-all text-center"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Browsable Player Grid — click to add/remove */}
+                <div>
+                  <label className="text-[9px] text-text-muted/40 uppercase tracking-wider block mb-1.5">
+                    Click to add ({getFilteredPlayers().length} matching)
+                  </label>
+                  <div className="max-h-[180px] overflow-y-auto border border-white/[0.06] rounded-lg">
+                    {getFilteredPlayers().slice(0, 40).map(p => {
+                      const isSelected = selectedPlayers.some(sp => sp.id === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => isSelected
+                            ? setSelectedPlayers(selectedPlayers.filter(x => x.id !== p.id))
+                            : addPlayer(p)
+                          }
+                          className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between transition-colors border-b border-white/[0.03] last:border-0 ${
+                            isSelected ? "bg-indigo-500/10" : "hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isSelected ? "bg-indigo-400" : "bg-white/[0.1]"}`} />
+                            <span className={`text-[11px] truncate ${isSelected ? "text-indigo-400 font-semibold" : "text-text-primary"}`}>{p.name}</span>
+                          </div>
+                          <span className="text-[9px] text-text-muted/40 shrink-0 ml-2">{p.team} · {p.position || "—"} · {p.bis?.toFixed(0) || "—"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Selected chips */}
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const filtered = getFilteredPlayers();
-                      setSelectedPlayers(filtered.slice(0, 50));
-                    }}
-                    className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 rounded px-2 py-1 hover:bg-indigo-500/10 transition-all"
-                  >
-                    Add all filtered ({getFilteredPlayers().length > 50 ? "50 max" : getFilteredPlayers().length})
-                  </button>
+                  <span className="text-[10px] text-text-muted/50">{selectedPlayers.length} selected</span>
                   {selectedPlayers.length > 0 && (
                     <button
                       onClick={() => setSelectedPlayers([])}
@@ -503,7 +548,7 @@ export function StudioBuilder({ players, teams }: Props) {
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto">
+                <div className="flex flex-wrap gap-1.5 max-h-[80px] overflow-y-auto">
                   {selectedPlayers.map(p => (
                     <span key={p.id} className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full px-2.5 py-0.5 flex items-center gap-1">
                       {p.name.split(" ").pop()} <span className="text-text-muted/50">{p.team}</span>
