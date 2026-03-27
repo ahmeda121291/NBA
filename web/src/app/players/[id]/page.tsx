@@ -9,6 +9,8 @@ import { getPlayerMatchupSplits } from "@/lib/db/queries/matchups";
 import { generateScoutingReport } from "@/lib/scouting";
 import { notFound } from "next/navigation";
 import { tierClass, tierLabel, tierBorder, getStreakBadge } from "@/lib/formatting";
+import { CURRENT_SEASON } from "@/lib/constants";
+import { PerformanceTrendChart } from "@/components/ui/performance-trend-chart";
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -83,7 +85,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
               </div>
               <span className="text-sm text-text-muted">{p.position || "—"} — {p.team_name} ({p.team_abbr})</span>
               <span className="text-text-muted/20">|</span>
-              <span className="text-sm text-text-muted font-stat">2025-26 Season</span>
+              <span className="text-sm text-text-muted font-stat">{CURRENT_SEASON} Season</span>
             </div>
             {hasMetrics && (
               <div className="flex items-center gap-4 mt-3">
@@ -186,6 +188,28 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           ))}
         </div>
       </GlassCard>
+
+      {/* Performance Trend */}
+      {gameLogs.length >= 3 && (() => {
+        const trendData = gameLogs.slice().reverse().map((gl: any, i: number) => ({
+          game: i + 1,
+          label: gl.game_date + " vs " + gl.opp_abbr,
+          pts: Number(gl.pts),
+          reb: Number(gl.reb),
+          ast: Number(gl.ast),
+        }));
+        const avgPts = Number(p.ppg);
+        return (
+          <GlassCard>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-indigo-400" />
+              <h2 className="section-header text-[10px]">Performance Trend</h2>
+              <span className="text-[9px] text-text-muted/40 ml-auto">Last {gameLogs.length} games — PTS per game</span>
+            </div>
+            <PerformanceTrendChart data={trendData} avgPts={avgPts} />
+          </GlassCard>
+        );
+      })()}
 
       {/* Contract Value */}
       {salary !== null && (

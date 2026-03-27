@@ -2,19 +2,21 @@ import Image from "next/image";
 import { Calendar, TrendingUp, TrendingDown, Zap, Flame, ArrowRight, AlertTriangle, Activity, BarChart3, Shield, Target, Sparkles, MessageCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
-import { getTodaysGamesWithProjections, getHottestPlayers, getTopPlayersWithMetrics, getAllTeamsWithMetrics, getBiggestMovers } from "@/lib/db/queries";
+import { getTodaysGamesWithProjections, getHottestPlayers, getTopPlayersWithMetrics, getAllTeamsWithMetrics, getBiggestMovers, getProjectionAccuracy } from "@/lib/db/queries";
 import { computeLiveProjections } from "@/lib/projections";
 import { tierClass, getStreakBadge } from "@/lib/formatting";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [todaysGames, hotPlayers, topByBIS, teamsRanked, movers] = await Promise.all([
+  const [todaysGames, hotPlayers, topByBIS, teamsRanked, movers, accuracy] = await Promise.all([
     getTodaysGamesWithProjections(),
     getHottestPlayers(7),
     getTopPlayersWithMetrics(5),
     getAllTeamsWithMetrics(),
     getBiggestMovers(6),
+    getProjectionAccuracy(),
   ]);
 
   let games = todaysGames as any[];
@@ -81,7 +83,7 @@ export default async function DashboardPage() {
             </div>
           </div>
           <p className="text-sm text-text-muted">
-            {today} — 2025-26 Season
+            {today} — {CURRENT_SEASON} Season
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
@@ -175,6 +177,71 @@ export default async function DashboardPage() {
           })()}
         </div>
       )}
+
+      {/* Model Accuracy Card */}
+      {accuracy && (() => {
+        const acc = accuracy as any;
+        const total = Number(acc.total_games) || 0;
+        const correct = Number(acc.correct) || 0;
+        const seasonPct = total > 0 ? (correct / total) * 100 : 0;
+        const last7Total = Number(acc.last_7_total) || 0;
+        const last7Correct = Number(acc.last_7_correct) || 0;
+        const last7Pct = last7Total > 0 ? (last7Correct / last7Total) * 100 : 0;
+        const last30Total = Number(acc.last_30_total) || 0;
+        const last30Correct = Number(acc.last_30_correct) || 0;
+        const last30Pct = last30Total > 0 ? (last30Correct / last30Total) * 100 : 0;
+        const pctColor = (pct: number) => pct >= 65 ? "text-emerald-400" : pct >= 55 ? "text-amber-400" : "text-rose-400";
+        const barColor = (pct: number) => pct >= 65 ? "bg-emerald-400" : pct >= 55 ? "bg-amber-400" : "bg-rose-400";
+
+        return total > 0 ? (
+          <GlassCard variant="accent" className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full -translate-y-12 translate-x-12" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-4">
+                <Target className="h-4 w-4 text-emerald-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Model Accuracy</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                {/* Season */}
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`font-stat text-3xl font-bold ${pctColor(seasonPct)}`}>{seasonPct.toFixed(1)}%</span>
+                    <span className="text-[10px] text-text-muted/60 uppercase tracking-wider">Season</span>
+                  </div>
+                  <p className="text-[11px] text-text-muted/50 font-stat mt-0.5">{correct} of {total} games correct</p>
+                  {/* Progress bar */}
+                  <div className="flex h-2 rounded-full overflow-hidden bg-white/[0.06] mt-2">
+                    <div className={`h-full rounded-full ${barColor(seasonPct)} transition-all`} style={{ width: `${seasonPct}%` }} />
+                  </div>
+                </div>
+                {/* Last 7 + Last 30 */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-text-muted/60">Last 7 Days</span>
+                    <span className={`font-stat text-sm font-bold ${pctColor(last7Pct)}`}>
+                      {last7Total > 0 ? `${last7Pct.toFixed(1)}%` : "—"}
+                      {last7Total > 0 && <span className="text-text-muted/40 font-normal text-[10px] ml-1">({last7Correct}/{last7Total})</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-text-muted/60">Last 30 Days</span>
+                    <span className={`font-stat text-sm font-bold ${pctColor(last30Pct)}`}>
+                      {last30Total > 0 ? `${last30Pct.toFixed(1)}%` : "—"}
+                      {last30Total > 0 && <span className="text-text-muted/40 font-normal text-[10px] ml-1">({last30Correct}/{last30Total})</span>}
+                    </span>
+                  </div>
+                </div>
+                {/* Methodology link */}
+                <div className="flex items-end justify-end">
+                  <a href="/methodology" className="text-[10px] text-indigo-400 uppercase tracking-wider hover:underline transition-colors">
+                    How It Works →
+                  </a>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        ) : null;
+      })()}
 
       {/* Trending Now — Risers + Fallers */}
       {(risers.length > 0 || fallers.length > 0) && (

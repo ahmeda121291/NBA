@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getAllTeamsWithFullStats } from "@/lib/db/queries";
 import { TeamsTable } from "./teams-table";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 export default async function TeamsPage() {
   const teams = (await getAllTeamsWithFullStats()) as any[];
@@ -10,7 +11,7 @@ export default async function TeamsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight gradient-text">Teams</h1>
         <p className="text-sm text-text-muted mt-1">
-          All 30 NBA teams — CourtVision metrics + traditional stats — 2025-26 season
+          All 30 NBA teams — CourtVision metrics + traditional stats — {CURRENT_SEASON} season
         </p>
       </div>
       <Suspense>

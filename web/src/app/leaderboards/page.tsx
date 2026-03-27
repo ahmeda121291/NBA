@@ -7,6 +7,7 @@ import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import { getAllPlayersWithFullStats, getHottestPlayers } from "@/lib/db/queries";
 import { LeaderboardTabs } from "./leaderboard-tabs";
 import { tierClass, getStreakBadge } from "@/lib/formatting";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 export default async function LeaderboardsPage() {
   const [allPlayers, hotLFI] = await Promise.all([
@@ -25,7 +26,7 @@ export default async function LeaderboardsPage() {
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold tracking-tight gradient-text">Leaderboards</h1>
-        <p className="text-sm text-text-muted mt-1">CourtVision metric rankings — 2025-26 season</p>
+        <p className="text-sm text-text-muted mt-1">CourtVision metric rankings — {CURRENT_SEASON} season</p>
       </div>
 
       {/* Top 3 BIS Podium */}

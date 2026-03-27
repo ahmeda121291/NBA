@@ -99,16 +99,26 @@ export function SearchOverlay() {
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 h-9 w-64 bg-white/[0.02] border border-white/[0.06] rounded-lg px-3 text-[13px] text-text-muted/50 hover:border-indigo-500/20 transition-all"
-      >
-        <Search className="h-3.5 w-3.5" />
-        <span>Search players, teams...</span>
-        <kbd className="ml-auto border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[10px] font-mono text-text-muted/50 rounded">
-          /
-        </kbd>
-      </button>
+      <>
+        {/* Full search bar — sm and up */}
+        <button
+          onClick={() => setOpen(true)}
+          className="hidden sm:flex items-center gap-2 h-9 w-64 bg-white/[0.02] border border-white/[0.06] rounded-lg px-3 text-[13px] text-text-muted/50 hover:border-indigo-500/20 transition-all"
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span>Search players, teams...</span>
+          <kbd className="ml-auto border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[10px] font-mono text-text-muted/50 rounded">
+            /
+          </kbd>
+        </button>
+        {/* Compact search icon — mobile only */}
+        <button
+          onClick={() => setOpen(true)}
+          className="sm:hidden relative border border-white/[0.08] bg-white/[0.02] p-2 text-text-muted transition-all duration-200 hover:text-indigo-400 hover:border-indigo-500/20 rounded-lg"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </>
     );
   }
 

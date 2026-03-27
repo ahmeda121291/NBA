@@ -2,6 +2,10 @@
 // CourtVision — Constants
 // ============================================================
 
+/** Current NBA season label — single source of truth */
+export const CURRENT_SEASON = "2025-26";
+export const SEASON_YEAR = 2026;
+
 export const METRIC_LABELS: Record<string, { name: string; description: string; short: string }> = {
   // ---- CourtVision Player Metrics ----
   bis: {

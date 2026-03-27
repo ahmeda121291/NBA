@@ -7,6 +7,7 @@ import { getTeamLogoByAbbr } from "@/lib/nba-data";
 import { getMostRecentGameDate, getGamesByDateWithProjections, getGameDatesInMonth } from "@/lib/db/queries";
 import { computeLiveProjections } from "@/lib/projections";
 import { tierClass } from "@/lib/formatting";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 export const dynamic = "force-dynamic"; // Always fresh projections
 
@@ -123,7 +124,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight gradient-text">Games</h1>
-          <p className="text-sm text-text-muted mt-1">Results, predictions & matchup intelligence — 2025-26 season</p>
+          <p className="text-sm text-text-muted mt-1">Results, predictions & matchup intelligence — {CURRENT_SEASON} season</p>
         </div>
         <div className="flex items-center gap-4">
           <GamesRefresh hasLiveGames={hasLiveGames} hasScheduledGames={hasScheduledGames} isTodayOrFuture={isTodayOrFuture} />

@@ -2,6 +2,7 @@
 
 import { Bell, Menu } from "lucide-react";
 import { SearchOverlay } from "@/components/shared/search-overlay";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 interface HeaderProps {
   onMenuToggle?: () => void;
@@ -28,15 +29,13 @@ export function Header({ onMenuToggle, userMenu }: HeaderProps) {
           <div className="flex items-center gap-2 px-3 py-1 border border-indigo-500/15 bg-indigo-500/5 rounded-md">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
             <span className="text-[10px] font-semibold tracking-wider uppercase text-indigo-400/80">
-              2025-26
+              {CURRENT_SEASON}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:block">
-            <SearchOverlay />
-          </div>
+          <SearchOverlay />
 
           <button
             title="Notifications coming soon"

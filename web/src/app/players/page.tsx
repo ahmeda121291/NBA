@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getAllPlayersWithFullStats } from "@/lib/db/queries";
 import { PlayersTable } from "./players-table";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 export default async function PlayersPage() {
   const players = (await getAllPlayersWithFullStats(200)) as any[];
@@ -10,7 +11,7 @@ export default async function PlayersPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight gradient-text">Players</h1>
         <p className="text-sm text-text-muted mt-1">
-          All players — CourtVision metrics + traditional stats — 2025-26 season
+          All players — CourtVision metrics + traditional stats — {CURRENT_SEASON} season
         </p>
       </div>
       <Suspense>

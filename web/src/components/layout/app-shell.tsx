@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { LiveTicker } from "./live-ticker";
+import { OnboardingTour } from "@/components/shared/onboarding-tour";
 
 export function AppShell({ children, userMenu }: { children: React.ReactNode; userMenu?: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -20,6 +21,7 @@ export function AppShell({ children, userMenu }: { children: React.ReactNode; us
           </div>
         </main>
       </div>
+      <OnboardingTour />
     </div>
   );
 }

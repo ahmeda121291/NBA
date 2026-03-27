@@ -20,6 +20,7 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CURRENT_SEASON } from "@/lib/constants";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, shortcut: "1" },
@@ -112,14 +113,14 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
       {/* Footer */}
       <div className="border-t border-white/[0.06] px-5 py-4 space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" title="Data refreshes daily via the CourtVision pipeline">
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
           <p className="text-[11px] text-emerald-400/70 font-mono tracking-wide uppercase">
             Data: Live
           </p>
         </div>
         <div className="flex items-center justify-between text-[10px] font-mono text-text-muted/40">
-          <span>2025-26 Season</span>
+          <span>{CURRENT_SEASON} Season</span>
           <span>v2.1</span>
         </div>
       </div>

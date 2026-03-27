@@ -807,6 +807,34 @@ export async function getAllTeamsWithFullStats() {
   });
 }
 
+/** Get projection accuracy stats (season, last 7 days, last 30 days) */
+export async function getProjectionAccuracy() {
+  const rows = await db.execute(sql`
+    SELECT
+      COUNT(*) as total_games,
+      SUM(CASE
+        WHEN (gp.projected_winner_id = g.home_team_id AND g.home_score > g.away_score)
+          OR (gp.projected_winner_id = g.away_team_id AND g.away_score > g.home_score)
+        THEN 1 ELSE 0 END) as correct,
+      SUM(CASE WHEN g.game_date >= CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END) as last_7_total,
+      SUM(CASE
+        WHEN g.game_date >= CURRENT_DATE - INTERVAL '7 days'
+          AND ((gp.projected_winner_id = g.home_team_id AND g.home_score > g.away_score)
+            OR (gp.projected_winner_id = g.away_team_id AND g.away_score > g.home_score))
+        THEN 1 ELSE 0 END) as last_7_correct,
+      SUM(CASE WHEN g.game_date >= CURRENT_DATE - INTERVAL '30 days' THEN 1 ELSE 0 END) as last_30_total,
+      SUM(CASE
+        WHEN g.game_date >= CURRENT_DATE - INTERVAL '30 days'
+          AND ((gp.projected_winner_id = g.home_team_id AND g.home_score > g.away_score)
+            OR (gp.projected_winner_id = g.away_team_id AND g.away_score > g.home_score))
+        THEN 1 ELSE 0 END) as last_30_correct
+    FROM game_projections gp
+    JOIN games g ON g.id = gp.game_id
+    WHERE g.status = 'final' AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+  `);
+  return rows[0] || null;
+}
+
 /** Recent games with team metrics for dashboard */
 export async function getRecentGamesWithMetrics(limit = 6) {
   const rows = await db.execute(sql`

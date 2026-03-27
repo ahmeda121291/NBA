@@ -7,6 +7,7 @@ import {
   BarChart, Bar, Cell, ReferenceLine, Label, LabelList
 } from "recharts";
 import { Download, Grid3X3, Trophy, BarChart3, TrendingUp, Zap, Users, Search, X, Twitter, Instagram, Monitor, ChevronDown, ChevronUp } from "lucide-react";
+import { CURRENT_SEASON, SEASON_YEAR } from "@/lib/constants";
 
 // ============================================================
 // Types
@@ -604,7 +605,7 @@ export function StudioBuilder({ players, teams }: Props) {
             <div className="mb-4 shrink-0">
               <h2 className="text-xl font-bold text-white leading-tight">{displayTitle}</h2>
               <p className="text-[11px] text-gray-500 mt-1">
-                2025-26 Season · courtvisionai.io
+                {CURRENT_SEASON} Season · courtvisionai.io
               </p>
             </div>
 
@@ -860,7 +861,7 @@ function StatCard({ player }: { player: PlayerData | null }) {
     <div className="flex flex-col items-center justify-center h-full">
       <div className="text-center mb-6">
         <h3 className="text-3xl font-bold text-white">{player.name}</h3>
-        <p className="text-sm text-gray-400 mt-1">{player.team} · {player.position || "—"} · 2025-26</p>
+        <p className="text-sm text-gray-400 mt-1">{player.team} · {player.position || "—"} · {CURRENT_SEASON}</p>
       </div>
 
       {/* BIS Hero */}

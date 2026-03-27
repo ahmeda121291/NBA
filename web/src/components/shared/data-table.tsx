@@ -399,10 +399,13 @@ export function DataTable<T>({
 
       {/* Grid-based Table */}
       <div className="glass-card rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="relative">
+          {/* Mobile scroll hint — right edge gradient */}
+          <div className="absolute right-0 top-0 bottom-0 w-6 pointer-events-none z-20 bg-gradient-to-l from-[#0d1117] to-transparent sm:hidden" />
+        <div className="overflow-x-auto max-h-[80vh] overflow-y-auto">
           {/* Header row */}
           <div
-            className="grid border-b border-white/[0.06]"
+            className="grid border-b border-white/[0.06] sticky top-0 z-10 bg-[#0d1117]"
             style={{ gridTemplateColumns: gridTemplate }}
           >
             {visCols.map((col) => {
@@ -458,6 +461,7 @@ export function DataTable<T>({
               No data matches your filters.
             </div>
           )}
+        </div>
         </div>
       </div>
       <p className="text-[10px] text-text-muted/40 mt-2 font-stat text-right">
