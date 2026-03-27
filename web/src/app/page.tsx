@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Calendar, TrendingUp, TrendingDown, Zap, Flame, ArrowRight, AlertTriangle, Activity, BarChart3, Shield, Target, Sparkles, MessageCircle } from "lucide-react";
+import { Calendar, TrendingUp, TrendingDown, Zap, Flame, ArrowRight, AlertTriangle, Activity, BarChart3, Shield, Target, Sparkles } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import { getTodaysGamesWithProjections, getHottestPlayers, getTopPlayersWithMetrics, getAllTeamsWithMetrics, getBiggestMovers, getProjectionAccuracy } from "@/lib/db/queries";
@@ -90,9 +90,6 @@ export default async function DashboardPage() {
         <div className="hidden sm:flex items-center gap-2">
           <a href="/studio" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-indigo-400 transition-colors uppercase tracking-wider border border-white/[0.06] rounded px-3 py-1.5">
             <Sparkles className="h-3 w-3" /> Studio
-          </a>
-          <a href="/ask" className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-indigo-400 transition-colors uppercase tracking-wider border border-white/[0.06] rounded px-3 py-1.5">
-            <MessageCircle className="h-3 w-3" /> Ask CV
           </a>
         </div>
       </div>
@@ -596,11 +593,6 @@ export default async function DashboardPage() {
               <Sparkles className="h-5 w-5 text-indigo-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
               <p className="text-[11px] font-semibold text-text-primary">Studio</p>
               <p className="text-[9px] text-text-muted/50 mt-0.5">Create shareable charts</p>
-            </a>
-            <a href="/ask" className="glass-card p-4 rounded-lg text-center hover:border-indigo-500/20 transition-colors group">
-              <MessageCircle className="h-5 w-5 text-indigo-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-[11px] font-semibold text-text-primary">Ask CV</p>
-              <p className="text-[9px] text-text-muted/50 mt-0.5">Query basketball data</p>
             </a>
           </div>
 

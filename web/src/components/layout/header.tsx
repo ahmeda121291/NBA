@@ -1,7 +1,6 @@
 "use client";
 
 import { Bell, Menu } from "lucide-react";
-import { SearchOverlay } from "@/components/shared/search-overlay";
 import { CURRENT_SEASON } from "@/lib/constants";
 
 interface HeaderProps {
@@ -35,8 +34,6 @@ export function Header({ onMenuToggle, userMenu }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <SearchOverlay />
-
           <button
             title="Notifications coming soon"
             className="relative border border-white/[0.08] bg-white/[0.02] p-2 text-text-muted transition-all duration-200 hover:text-indigo-400 hover:border-indigo-500/20 rounded-lg"
