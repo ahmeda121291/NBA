@@ -284,18 +284,17 @@ function formatVal(val: number, metric: string): string {
 
 export function AskEngine({ players }: Props) {
   const [query, setQuery] = useState("");
-  const [activeQuery, setActiveQuery] = useState("");
 
+  // Instant results as you type (no button click needed)
   const result = useMemo(() => {
-    if (activeQuery.length < 3) return null;
-    return parseQuery(activeQuery, players);
-  }, [activeQuery, players]);
+    if (query.length < 3) return null;
+    return parseQuery(query, players);
+  }, [query, players]);
 
   const handleSubmit = (q?: string) => {
     const finalQuery = q || query;
     if (finalQuery.length >= 3) {
       setQuery(finalQuery);
-      setActiveQuery(finalQuery);
     }
   };
 
@@ -393,10 +392,10 @@ export function AskEngine({ players }: Props) {
           </div>
 
           <button
-            onClick={() => { setActiveQuery(""); setQuery(""); }}
+            onClick={() => setQuery("")}
             className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            ← Ask another question
+            ← Clear search
           </button>
         </div>
       )}
