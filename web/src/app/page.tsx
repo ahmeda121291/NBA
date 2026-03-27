@@ -466,15 +466,15 @@ export default async function DashboardPage() {
             <GlassCard padding="none" hover={false}>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
-                    <th className="px-4 py-2">#</th>
-                    <th className="px-4 py-2">Player</th>
-                    <th className="px-4 py-2 text-right">BIS</th>
-                    <th className="px-4 py-2 text-right">Conf</th>
-                    <th className="px-4 py-2 text-right">%ile</th>
-                    <th className="px-4 py-2 text-right">DRS</th>
-                    <th className="px-4 py-2 text-right">OIQ</th>
-                    <th className="px-4 py-2 text-right">PPG</th>
+                  <tr className="border-b border-white/[0.06] text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
+                    <th className="px-3 py-2.5">#</th>
+                    <th className="px-3 py-2.5">Player</th>
+                    <th className="px-3 py-2.5 text-right"><span className="text-indigo-400/70">BIS</span></th>
+                    <th className="px-3 py-2.5 text-right">Conf</th>
+                    <th className="px-3 py-2.5 text-right">%ile</th>
+                    <th className="px-3 py-2.5 text-right"><span className="text-indigo-400/70">DRS</span></th>
+                    <th className="px-3 py-2.5 text-right"><span className="text-indigo-400/70">OIQ</span></th>
+                    <th className="px-3 py-2.5 text-right">PPG</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -486,24 +486,24 @@ export default async function DashboardPage() {
                     const rda = p.rda_score ? Number(p.rda_score) : null;
                     return (
                       <tr key={p.id} className="border-b border-white/[0.03] table-row-hover group">
-                        <td className="px-4 py-2 font-stat text-text-muted/30 text-xs">{i + 1}</td>
-                        <td className="px-4 py-2">
-                          <a href={`/players/${p.id}`} className="flex items-center gap-2 group-hover:text-indigo-400 transition-colors">
-                            <div className="relative h-7 w-7 shrink-0 rounded-sm overflow-hidden bg-white/[0.04]">
+                        <td className="px-3 py-2 font-stat text-[12px] text-text-muted/30">{i + 1}</td>
+                        <td className="px-3 py-2">
+                          <a href={`/players/${p.id}`} className="flex items-center gap-2.5 group-hover:text-indigo-400 transition-colors">
+                            <div className="relative h-7 w-7 shrink-0 rounded-sm overflow-hidden bg-white/[0.04] border border-white/[0.06]">
                               <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.4] translate-y-[2px]" unoptimized />
                             </div>
                             <div>
-                              <span className="text-[12px] font-semibold">{p.full_name}</span>
+                              <span className="text-[13px] font-semibold">{p.full_name}</span>
                               <span className="text-[10px] text-text-muted ml-2">{p.team_abbr}</span>
                             </div>
                           </a>
                         </td>
-                        <td className={`px-4 py-2 text-right font-stat font-bold ${tierClass(bis)}`}>{bis?.toFixed(0) ?? "—"}</td>
-                        <td className="px-4 py-2 text-right font-stat text-[11px] text-text-muted">{conf ? (conf * 100).toFixed(0) + "%" : "—"}</td>
-                        <td className="px-4 py-2 text-right font-stat text-[11px] text-text-secondary">{pctl?.toFixed(0) ?? "—"}th</td>
-                        <td className={`px-4 py-2 text-right font-stat text-[11px] ${tierClass(drs)}`}>{drs?.toFixed(0) ?? "—"}</td>
-                        <td className={`px-4 py-2 text-right font-stat text-[11px] ${tierClass(rda)}`}>{rda?.toFixed(0) ?? "—"}</td>
-                        <td className="px-4 py-2 text-right font-stat text-[11px] text-text-secondary">{Number(p.ppg).toFixed(1)}</td>
+                        <td className={`px-3 py-2 text-right font-stat text-[13px] font-bold ${tierClass(bis)}`}>{bis?.toFixed(0) ?? "—"}</td>
+                        <td className="px-3 py-2 text-right font-stat text-[13px] text-text-muted">{conf ? (conf * 100).toFixed(0) + "%" : "—"}</td>
+                        <td className="px-3 py-2 text-right font-stat text-[13px] text-text-secondary">{pctl?.toFixed(0) ?? "—"}th</td>
+                        <td className={`px-3 py-2 text-right font-stat text-[13px] ${tierClass(drs)}`}>{drs?.toFixed(0) ?? "—"}</td>
+                        <td className={`px-3 py-2 text-right font-stat text-[13px] ${tierClass(rda)}`}>{rda?.toFixed(0) ?? "—"}</td>
+                        <td className="px-3 py-2 text-right font-stat text-[13px] text-text-secondary">{Number(p.ppg).toFixed(1)}</td>
                       </tr>
                     );
                   })}

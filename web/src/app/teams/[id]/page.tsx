@@ -118,38 +118,27 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
       {/* Season Stats */}
       <GlassCard>
         <h2 className="section-header mb-4 text-[10px]">Season Stats</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-          <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Wins</p>
-            <p className="font-stat text-xl font-bold mt-0.5 text-emerald-400">{wins}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Losses</p>
-            <p className="font-stat text-xl font-bold mt-0.5 text-rose-400">{losses}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted/60">Win%</p>
-            <p className="font-stat text-xl font-bold mt-0.5">{winPct}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted/60">FG%</p>
-            <p className="font-stat text-xl font-bold mt-0.5">{(Number(t.fg_pct ?? 0) * 100).toFixed(1)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted/60">3P%</p>
-            <p className="font-stat text-xl font-bold mt-0.5">{(Number(t.fg3_pct ?? 0) * 100).toFixed(1)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted/60">FT%</p>
-            <p className="font-stat text-xl font-bold mt-0.5">{(Number(t.ft_pct ?? 0) * 100).toFixed(1)}</p>
-          </div>
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+          {[
+            { label: "Wins", val: wins, cls: "text-emerald-400" },
+            { label: "Losses", val: losses, cls: "text-rose-400" },
+            { label: "Win%", val: winPct, cls: "" },
+            { label: "FG%", val: (Number(t.fg_pct ?? 0) * 100).toFixed(1), cls: "" },
+            { label: "3P%", val: (Number(t.fg3_pct ?? 0) * 100).toFixed(1), cls: "" },
+            { label: "FT%", val: (Number(t.ft_pct ?? 0) * 100).toFixed(1), cls: "" },
+          ].map((s) => (
+            <div key={s.label} className="text-center py-1">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/50 mb-1">{s.label}</p>
+              <p className={`font-stat text-xl font-bold ${s.cls}`}>{s.val}</p>
+            </div>
+          ))}
         </div>
       </GlassCard>
 
       {/* Advanced Stats */}
       <GlassCard>
         <h2 className="section-header mb-4 text-[10px]">Advanced Stats</h2>
-        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           {[
             { label: "ORTG", val: t.ortg ? Number(t.ortg).toFixed(1) : "—", good: t.ortg && Number(t.ortg) > LEAGUE_AVG_ORTG },
             { label: "DRTG", val: t.drtg ? Number(t.drtg).toFixed(1) : "—", good: t.drtg && Number(t.drtg) < LEAGUE_AVG_ORTG },
@@ -184,7 +173,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
+              <tr className="border-b border-white/[0.04] text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
                 <th className="px-3 py-2">Player</th>
                 <th className="px-3 py-2">Pos</th>
                 <th className="px-3 py-2 text-right">GP</th>

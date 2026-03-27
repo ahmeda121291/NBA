@@ -357,7 +357,7 @@ export default function ComparePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/[0.04] text-[10px] uppercase tracking-widest text-text-muted/60">
+                  <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
                     <th className="pb-3 text-left">Metric</th>
                     <th className="pb-3 text-right">{player1.full_name.split(" ").pop()}</th>
                     <th className="pb-3 text-center w-24">VS</th>
@@ -411,7 +411,7 @@ export default function ComparePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/[0.04] text-[10px] uppercase tracking-widest text-text-muted/60">
+                  <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
                     <th className="pb-3 text-left">Stat</th>
                     <th className="pb-3 text-right">{player1.full_name.split(" ").pop()}</th>
                     <th className="pb-3 text-right">{player2.full_name.split(" ").pop()}</th>

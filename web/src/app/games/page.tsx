@@ -248,21 +248,21 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                   {isFinal ? (
                     <>
                       <p className="font-stat text-2xl sm:text-3xl font-bold text-text-primary">
-                        {awayPts} <span className="text-text-muted/20">-</span> {homePts}
+                        {awayPts} <span className="text-text-muted/30">–</span> {homePts}
                       </p>
                       <p className="text-[10px] uppercase tracking-widest text-text-muted/40 font-semibold mt-1">Final</p>
                     </>
                   ) : isLive ? (
                     <>
                       <p className="font-stat text-2xl sm:text-3xl font-bold text-emerald-400">
-                        {awayPts ?? 0} <span className="text-text-muted/20">-</span> {homePts ?? 0}
+                        {awayPts ?? 0} <span className="text-text-muted/30">–</span> {homePts ?? 0}
                       </p>
                       <p className="text-[9px] uppercase tracking-widest text-red-400/70 font-semibold mt-0.5 animate-pulse">In Progress</p>
                     </>
                   ) : hasProjection ? (
                     <>
                       <p className="font-stat text-lg sm:text-xl font-bold text-text-muted/60">
-                        {projScoreAway} <span className="text-text-muted/20">-</span> {projScoreHome}
+                        {projScoreAway} <span className="text-text-muted/30">–</span> {projScoreHome}
                       </p>
                       {/* Score range */}
                       {projScoreAwayLow != null && projScoreAwayHigh != null && projScoreHomeLow != null && projScoreHomeHigh != null && (
@@ -306,13 +306,13 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                       {(homeProb * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <div className="flex h-1.5 rounded-sm overflow-hidden bg-white/[0.04]">
+                  <div className="flex h-2 rounded-sm overflow-hidden bg-white/[0.06]">
                     <div
                       className="h-full transition-all duration-500"
                       style={{
                         width: `${awayProb * 100}%`,
                         background: awayProb > homeProb
-                          ? "linear-gradient(90deg, rgba(129,140,248,0.5), rgba(129,140,248,0.25))"
+                          ? "linear-gradient(90deg, rgba(129,140,248,0.6), rgba(129,140,248,0.3))"
                           : "rgba(128,148,176,0.15)",
                       }}
                     />
@@ -321,7 +321,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                       style={{
                         width: `${homeProb * 100}%`,
                         background: homeProb > awayProb
-                          ? "linear-gradient(270deg, rgba(129,140,248,0.5), rgba(129,140,248,0.25))"
+                          ? "linear-gradient(270deg, rgba(129,140,248,0.6), rgba(129,140,248,0.3))"
                           : "rgba(128,148,176,0.15)",
                       }}
                     />
@@ -330,8 +330,8 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                   {keyReasons && keyReasons.length > 0 && (
                     <div className="mt-2 space-y-0.5">
                       {keyReasons.slice(0, 2).map((reason, i) => (
-                        <p key={i} className="text-[10px] text-text-muted/40 truncate">
-                          <TrendingUp className="inline h-2.5 w-2.5 mr-1 text-indigo-400/40" />
+                        <p key={i} className="text-[10px] text-text-muted/60 truncate">
+                          <TrendingUp className="inline h-2.5 w-2.5 mr-1 text-indigo-400/50" />
                           {reason}
                         </p>
                       ))}
