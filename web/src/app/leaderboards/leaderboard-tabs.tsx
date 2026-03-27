@@ -154,19 +154,19 @@ export function LeaderboardTabs({ players }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
-                <th className="p-3 w-10">#</th>
-                <th className="p-3">Player</th>
-                <th className="p-3 text-center">Pos</th>
-                <th className="p-3 text-right">
+              <tr className="border-b border-white/[0.06] text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
+                <th className="px-3 py-2.5 w-10">#</th>
+                <th className="px-3 py-2.5">Player</th>
+                <th className="px-3 py-2.5 text-center">Pos</th>
+                <th className="px-3 py-2.5 text-right">
                   <MetricTooltip metricKey={activeTab}>
                     <span className="text-indigo-400/70">{tabInfo.label}</span>
                   </MetricTooltip>
                 </th>
-                <th className="p-3 text-right"><MetricTooltip metricKey="ppg">PPG</MetricTooltip></th>
-                <th className="p-3 text-right"><MetricTooltip metricKey="rpg">RPG</MetricTooltip></th>
-                <th className="p-3 text-right"><MetricTooltip metricKey="apg">APG</MetricTooltip></th>
-                <th className="p-3 text-right"><MetricTooltip metricKey="gp">GP</MetricTooltip></th>
+                <th className="px-3 py-2.5 text-right"><MetricTooltip metricKey="ppg">PPG</MetricTooltip></th>
+                <th className="px-3 py-2.5 text-right"><MetricTooltip metricKey="rpg">RPG</MetricTooltip></th>
+                <th className="px-3 py-2.5 text-right"><MetricTooltip metricKey="apg">APG</MetricTooltip></th>
+                <th className="px-3 py-2.5 text-right"><MetricTooltip metricKey="gp">GP</MetricTooltip></th>
               </tr>
             </thead>
             <tbody>
@@ -174,26 +174,26 @@ export function LeaderboardTabs({ players }: Props) {
                 const score = Number(p[scoreKey]);
                 return (
                   <tr key={p.id} className="border-b border-white/[0.03] table-row-hover group">
-                    <td className="p-3 font-stat text-text-muted/30">{i + 1}</td>
-                    <td className="p-3">
-                      <a href={`/players/${p.id}`} className="flex items-center gap-2 group-hover:text-indigo-400 transition-colors">
-                        <div className="relative h-7 w-7 shrink-0 rounded-sm overflow-hidden bg-white/[0.04]">
+                    <td className="px-3 py-2 font-stat text-[12px] text-text-muted/30">{i + 1}</td>
+                    <td className="px-3 py-2">
+                      <a href={`/players/${p.id}`} className="flex items-center gap-2.5 group-hover:text-indigo-400 transition-colors">
+                        <div className="relative h-7 w-7 shrink-0 rounded-sm overflow-hidden bg-white/[0.04] border border-white/[0.06]">
                           <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.4] translate-y-[2px]" unoptimized />
                         </div>
                         <div>
-                          <span className="text-[12px] font-semibold">{p.full_name}</span>
+                          <span className="text-[13px] font-semibold">{p.full_name}</span>
                           <span className="text-[10px] text-text-muted ml-2">{p.team_abbr}</span>
                         </div>
                       </a>
                     </td>
-                    <td className="p-3 text-center text-[10px] text-text-muted">{p.position || "—"}</td>
-                    <td className={`p-3 text-right font-stat font-bold ${tierClass(score)}`}>
+                    <td className="px-3 py-2 text-center text-[11px] text-text-muted">{p.position || "—"}</td>
+                    <td className={`px-3 py-2 text-right font-stat text-[13px] font-bold ${tierClass(score)}`}>
                       {score.toFixed(0)}
                     </td>
-                    <td className="p-3 text-right font-stat text-[11px] text-text-secondary">{Number(p.ppg).toFixed(1)}</td>
-                    <td className="p-3 text-right font-stat text-[11px] text-text-secondary">{Number(p.rpg).toFixed(1)}</td>
-                    <td className="p-3 text-right font-stat text-[11px] text-text-secondary">{Number(p.apg).toFixed(1)}</td>
-                    <td className="p-3 text-right font-stat text-[11px] text-text-muted">{p.games_played}</td>
+                    <td className="px-3 py-2 text-right font-stat text-[13px] text-text-secondary">{Number(p.ppg).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat text-[13px] text-text-secondary">{Number(p.rpg).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat text-[13px] text-text-secondary">{Number(p.apg).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-stat text-[13px] text-text-muted">{p.games_played}</td>
                   </tr>
                 );
               })}

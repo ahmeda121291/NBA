@@ -168,7 +168,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
       {/* Season Stats */}
       <GlassCard>
         <h2 className="section-header mb-4 text-[10px]">Season Averages</h2>
-        <div className="grid grid-cols-4 gap-4 sm:grid-cols-6 lg:grid-cols-12">
+        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-12">
           {[
             { label: "GP", val: p.games_played },
             { label: "GS", val: p.games_started },
@@ -183,9 +183,9 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
             { label: "3P%", val: (Number(p.fg3_pct) * 100).toFixed(1) },
             { label: "FT%", val: (Number(p.ft_pct) * 100).toFixed(1) },
           ].map((s) => (
-            <div key={s.label} className="text-center">
-              <p className="text-[10px] uppercase tracking-wider text-text-muted/60">{s.label}</p>
-              <p className={`font-stat text-lg font-bold mt-0.5 ${s.highlight ? "text-indigo-400" : ""}`}>{s.val}</p>
+            <div key={s.label} className="text-center py-1">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted/50 mb-1">{s.label}</p>
+              <p className={`font-stat text-lg font-bold ${s.highlight ? "text-indigo-400" : ""}`}>{s.val}</p>
             </div>
           ))}
         </div>
@@ -316,7 +316,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
+                <tr className="border-b border-white/[0.04] text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
                   <th className="px-3 py-2">Opponent</th>
                   <th className="px-2 py-2 text-right">GP</th>
                   <th className="px-2 py-2 text-right">PTS</th>
@@ -380,7 +380,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/[0.04] text-left text-[9px] uppercase tracking-widest text-text-muted/40">
+                <tr className="border-b border-white/[0.04] text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Opp</th>
                   <th className="px-3 py-2 text-right">MIN</th>

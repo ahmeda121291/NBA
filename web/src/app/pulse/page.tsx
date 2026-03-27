@@ -178,7 +178,7 @@ export default async function PulsePage() {
                 </a>
               ))}
               {risers.length === 0 && (
-                <p className="text-sm text-text-muted/40 text-center py-6">No significant risers detected</p>
+                <p className="text-sm text-text-muted/50 text-center py-6">No significant risers detected</p>
               )}
             </div>
           </GlassCard>
@@ -221,7 +221,7 @@ export default async function PulsePage() {
                 </a>
               ))}
               {fallers.length === 0 && (
-                <p className="text-sm text-text-muted/40 text-center py-6">No significant fallers detected</p>
+                <p className="text-sm text-text-muted/50 text-center py-6">No significant fallers detected</p>
               )}
             </div>
           </GlassCard>
@@ -268,7 +268,7 @@ export default async function PulsePage() {
                 );
               })}
               {hotStreaks.length === 0 && (
-                <p className="text-sm text-text-muted/40 text-center py-6">No hot streaks detected</p>
+                <p className="text-sm text-text-muted/50 text-center py-6">No hot streaks detected</p>
               )}
             </div>
           </GlassCard>
@@ -310,7 +310,7 @@ export default async function PulsePage() {
                 );
               })}
               {coldStreaks.length === 0 && (
-                <p className="text-sm text-text-muted/40 text-center py-6">No cold streaks detected</p>
+                <p className="text-sm text-text-muted/50 text-center py-6">No cold streaks detected</p>
               )}
             </div>
           </GlassCard>

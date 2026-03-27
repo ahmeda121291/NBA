@@ -109,7 +109,6 @@ body > * {
     0 1px 3px rgba(0, 0, 0, 0.3),
     0 8px 32px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(129, 140, 248, 0.05);
-  transform: translateY(-1px);
 }
 
 .glass-card-accent {
@@ -215,7 +214,7 @@ body > * {
    ============================================================ */
 
 .section-header {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   text-transform: uppercase;
@@ -608,7 +607,7 @@ body > * {
 
 /* Table row hover with left accent */
 .table-row-hover {
-  transition: all var(--duration-fast) ease;
+  transition: background var(--duration-fast) ease;
   position: relative;
 }
 .table-row-hover::before {
@@ -624,13 +623,28 @@ body > * {
   transition: opacity var(--duration-fast) ease;
 }
 .table-row-hover:hover {
-  background: linear-gradient(
-    90deg,
-    rgba(129, 140, 248, 0.04) 0%,
-    rgba(129, 140, 248, 0.01) 100%
-  );
+  background: rgba(129, 140, 248, 0.03);
 }
 .table-row-hover:hover::before { opacity: 1; }
+
+/* ============================================================
+   TABLE SYSTEM — consistent look across <table> and grid tables
+   ============================================================ */
+
+/* Shared table header text style */
+.table-head-cell {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(132, 147, 168, 0.5);
+  white-space: nowrap;
+}
+
+/* Ensure stat numbers in tables always use tabular alignment */
+.font-stat {
+  font-variant-numeric: tabular-nums;
+}
 
 /* Input focus glow */
 .input-glow {

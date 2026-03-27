@@ -28,18 +28,18 @@ function BoxScoreTable({ players, teamAbbr, teamId }: { players: any[]; teamAbbr
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/[0.04]">
-              <th className="px-3 py-1.5 text-left text-[9px] uppercase tracking-widest text-text-muted/40">Player</th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="min">MIN</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40 font-bold"><MetricTooltip metricKey="ppg">PTS</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="reb">REB</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="ast">AST</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="stl">STL</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="blk">BLK</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="tov">TOV</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="fg">FG</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="fg3">3P</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="ft">FT</MetricTooltip></th>
-              <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-text-muted/40"><MetricTooltip metricKey="plus_minus">+/-</MetricTooltip></th>
+              <th className="px-3 py-1.5 text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Player</th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="min">MIN</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 font-bold"><MetricTooltip metricKey="ppg">PTS</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="reb">REB</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="ast">AST</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="stl">STL</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="blk">BLK</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="tov">TOV</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="fg">FG</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="fg3">3P</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="ft">FT</MetricTooltip></th>
+              <th className="px-2 py-1.5 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50"><MetricTooltip metricKey="plus_minus">+/-</MetricTooltip></th>
               <th className="px-2 py-1.5 text-right text-[9px] uppercase tracking-widest text-indigo-400/40"><MetricTooltip metricKey="bis">BIS</MetricTooltip></th>
             </tr>
           </thead>
@@ -579,15 +579,15 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/[0.04]">
-                  <th className="px-3 py-2 text-left text-[9px] uppercase tracking-widest text-text-muted/40">Player</th>
-                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Proj PTS</th>
-                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Range</th>
-                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Proj REB</th>
-                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Proj AST</th>
+                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Player</th>
+                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Proj PTS</th>
+                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Range</th>
+                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Proj REB</th>
+                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Proj AST</th>
                   <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-indigo-400/40">
                     <MetricTooltip metricKey="bis">BIS</MetricTooltip>
                   </th>
-                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-text-muted/40">Vol</th>
+                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Vol</th>
                 </tr>
               </thead>
               <tbody>
