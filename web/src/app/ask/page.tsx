@@ -10,9 +10,9 @@ export default async function AskPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight gradient-text">Ask CourtVision</h1>
+        <h1 className="text-3xl font-bold tracking-tight gradient-text">Search</h1>
         <p className="text-sm text-text-muted mt-1">
-          Ask any basketball question — powered by real data, not AI hallucinations
+          Find any stat, ranking, or comparison — powered by real data
         </p>
       </div>
 

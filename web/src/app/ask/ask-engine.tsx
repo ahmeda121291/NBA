@@ -65,7 +65,12 @@ function parseQuery(query: string, players: Player[]): QueryResult | null {
 
   for (const [key, positions] of Object.entries(posMap)) {
     if (q.includes(key)) {
-      filtered = filtered.filter((p) => positions.includes(p.position));
+      const posFiltered = filtered.filter((p) => {
+        const pos = (p.position || "").toUpperCase();
+        return positions.some((pp) => pos.includes(pp) || pp.includes(pos));
+      });
+      // Only apply filter if it produces results (positions may be empty in DB)
+      if (posFiltered.length > 0) filtered = posFiltered;
       break;
     }
   }
