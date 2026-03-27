@@ -639,7 +639,7 @@ async function main() {
       sps: Math.round(pem * 100) / 100, // PEM stored in sps column
       spsConfidence: Math.round(bisConfidence * 100) / 100,
       spsLabel: pemLabel,
-      spsComponents: { rawApg: rawApgScore, per36Ast: per36AstScore, astPct: astPctScore, creation: creationScore, ts: tsPlaymaking },
+      spsComponents: { rawApg: rawApgScore, per36Ast: per36AstScore, astPct: astPctScore, creation: creationScore, astTov: astTovScore, versatility: assistVersatility },
       goi: Math.round(goi * 100) / 100,
       goiConfidence: Math.round(goiConfidence * 100) / 100,
       goiComponents: { pm: goiPlusMinusScore, clutch: goiClutchScore, closeGame: goiFourthQScore },
