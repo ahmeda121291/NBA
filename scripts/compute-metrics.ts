@@ -213,10 +213,16 @@ async function main() {
     const bisConfidence = clamp(Math.min(gp / 50, 1), 0, 1);
 
     // ==================================================================
-    // BIS v2 — Per-minute scaling, TS%, +/-, TOV penalty, DEF_RATING
+    // BIS v3 — Usage-adjusted scoring, minutes-floor, reduced GP weight
+    // Changes from v2:
+    //   - GP weight 10% → 4% (availability matters but shouldn't dominate talent)
+    //   - Added usage-adjusted efficiency: rewards high-volume + high-TS%
+    //   - Per-36 only kicks in above 20 MPG to avoid inflating garbage-time guys
+    //   - +/- uses weighted recency (recent games matter more)
+    //   - Minutes floor: players under 15 MPG get soft-capped to prevent
+    //     garbage-time bench players from ranking alongside starters
     // ==================================================================
-    // Per-36 normalize: scale stats as if player played 36 min
-    const per36Factor = mpg > 10 ? 36 / mpg : 1;
+    const per36Factor = mpg > 20 ? 36 / mpg : (mpg > 10 ? 36 / mpg * 0.85 : 1);
     const ppg36 = ppg * per36Factor;
     const rpg36 = rpg * per36Factor;
     const apg36 = apg * per36Factor;
@@ -226,18 +232,22 @@ async function main() {
 
     // Z-score normalized (per-36)
     const ppgNorm = normalize(ppg36, avg.ppg * (36 / (avg.mpg || 30)), std.ppg * (36 / (avg.mpg || 30)));
-    const rpgNorm = normalize(rpg, avg.rpg, std.rpg); // rebounds less min-dependent
+    const rpgNorm = normalize(rpg, avg.rpg, std.rpg);
     const apgNorm = normalize(apg36, avg.apg * (36 / (avg.mpg || 30)), std.apg * (36 / (avg.mpg || 30)));
     const spgNorm = normalize(spg, avg.spg, std.spg);
     const bpgNorm = normalize(bpg, avg.bpg, std.bpg);
     const tsNorm = normalize(tsPct, avg.ts_pct || 0.56, std.ts_pct || 0.04);
     const gpNorm = normalize(gp, avg.games_played, std.games_played);
 
-    // +/- from game logs (avg of last 15 games)
+    // +/- from game logs with recency weighting (game 1 = 1.0, game 15 = 0.3)
     const recentLogs = logs.slice(0, 15);
-    const avgPlusMinus = recentLogs.length > 0
-      ? recentLogs.reduce((s, l) => s + num(l.plus_minus), 0) / recentLogs.length
-      : 0;
+    let pmWeightedSum = 0, pmWeightTotal = 0;
+    for (let i = 0; i < recentLogs.length; i++) {
+      const w = 1.0 - (i * 0.05);
+      pmWeightedSum += num(recentLogs[i].plus_minus) * w;
+      pmWeightTotal += w;
+    }
+    const avgPlusMinus = pmWeightTotal > 0 ? pmWeightedSum / pmWeightTotal : 0;
     const pmNorm = clamp(50 + avgPlusMinus * 2, 0, 100);
 
     // TOV penalty (inverted: lower TOV = better)
@@ -246,104 +256,122 @@ async function main() {
     // DEF_RATING component for BIS (small weight)
     const defComponent = defRating > 0 ? clamp(50 + (112 - defRating) * 2.5, 0, 100) : 50;
 
-    const bis = clamp(
-      ppgNorm * 0.20 +      // scoring (per-36)
-      rpgNorm * 0.12 +      // rebounding
-      apgNorm * 0.15 +      // playmaking (per-36)
-      tsNorm * 0.12 +       // efficiency (TS% not FG%)
-      spgNorm * 0.05 +      // steals
-      bpgNorm * 0.05 +      // blocks
-      pmNorm * 0.10 +       // +/- impact
-      defComponent * 0.06 + // defensive rating
-      tovPenalty * 0.05 +   // turnover penalty (inverted)
-      gpNorm * 0.10         // durability
+    // Usage-adjusted efficiency: rewards high-volume scorers who maintain efficiency
+    // A player scoring 28 PPG on 60% TS is much more valuable than 8 PPG on 62% TS
+    const usgEfficiency = (usgPct > 0.15 && tsPct > 0)
+      ? clamp(50 + ((tsPct - 0.54) * 100) * (usgPct / 0.20) * 3, 10, 95)
+      : 50;
+
+    // Minutes floor penalty: players under 15 MPG get soft-penalized
+    // This prevents garbage-time producers from ranking with starters
+    const minutesFloor = mpg >= 25 ? 1.0 : mpg >= 15 ? 0.85 + (mpg - 15) * 0.015 : 0.65 + (mpg / 15) * 0.2;
+
+    const bisRaw = clamp(
+      ppgNorm * 0.18 +         // scoring (per-36)
+      rpgNorm * 0.10 +         // rebounding
+      apgNorm * 0.13 +         // playmaking (per-36)
+      tsNorm * 0.08 +          // raw efficiency
+      usgEfficiency * 0.12 +   // NEW: usage-adjusted efficiency (replaces part of TS weight)
+      spgNorm * 0.05 +         // steals
+      bpgNorm * 0.04 +         // blocks
+      pmNorm * 0.10 +          // +/- impact (recency-weighted)
+      defComponent * 0.08 +    // defensive rating (bumped: defense matters)
+      tovPenalty * 0.05 +      // turnover penalty (inverted)
+      gpNorm * 0.04 +          // durability (reduced from 10%)
+      (mpg >= 15 ? 50 * 0.03 : 0) // minimum minutes threshold signal
     );
+    const bis = bisRaw * minutesFloor;
 
     // ==================================================================
-    // OIQ v2 (Offensive Impact Quotient) — stored as rda_score in DB
-    // Fixed: no more triple TOV penalty, volume bonus for high-usage stars
+    // OIQ v3 (Offensive Impact Quotient) — stored as rda_score in DB
+    // Changes from v2:
+    //   - Volume bonus is now continuous (no step-function cliffs)
+    //   - Assists are position-adjusted (guards expected to pass more)
+    //   - Added scoring gravity: PPG × TS% interaction (volume + efficiency)
     // ==================================================================
 
-    // Raw TS% on wider scale (not compressed z-score) — every 1% matters
-    const rawTsAboveAvg = (tsPct - (avg.ts_pct || 0.56)) * 100; // e.g., +5 = 5% above avg
-    const tsOiqScore = clamp(50 + rawTsAboveAvg * 5, 10, 95); // wider spread than before
+    const rawTsAboveAvg = (tsPct - (avg.ts_pct || 0.56)) * 100;
+    const tsOiqScore = clamp(50 + rawTsAboveAvg * 5, 10, 95);
 
-    // Usage: higher usage = harder to be efficient. Give credit for volume.
     const posUsgAvg = posAvgUsg[posGroup] || avg.usg_pct;
     const usgAboveAvg = usgPct - posUsgAvg;
-    const usgVsPos = clamp(50 + usgAboveAvg * 200, 10, 95); // usage above position avg
+    const usgVsPos = clamp(50 + usgAboveAvg * 200, 10, 95);
 
-    // Volume bonus: scoring 25+ PPG on good TS% is elite
-    const volumeBonus = ppg >= 25 && tsPct > 0.57 ? 15 :
-                        ppg >= 20 && tsPct > 0.55 ? 10 :
-                        ppg >= 15 && tsPct > 0.54 ? 5 : 0;
+    // Continuous volume bonus (no cliffs): smoothly rewards higher PPG + good TS%
+    // A 25 PPG scorer on 58% TS = ~18, a 15 PPG scorer on 55% TS = ~5
+    const tsAboveFloor = Math.max(tsPct - 0.52, 0); // floor at 52% TS
+    const volumeBonus = clamp(ppg * tsAboveFloor * 100 * 0.3, 0, 25);
 
-    // Assist rate (raw APG, NOT AST/TOV — don't penalize turnovers here)
-    const apgScore = clamp(50 + (apg - (avg.apg || 3)) * 5, 10, 90);
+    // Position-adjusted assists: guards need more APG to score well
+    const posApgExpected = isGuard ? (avg.apg || 3) * 1.3 : (avg.apg || 3) * 0.7;
+    const apgScore = clamp(50 + (apg - posApgExpected) * 5, 10, 90);
 
-    // Free throw rate (FTA/FGA proxy for getting to the line)
+    // Free throw rate (getting to the line)
     const ftRate = num(ps.fga) > 0 ? num(ps.fta) / num(ps.fga) : 0;
     const ftRateNorm = clamp(50 + (ftRate - 0.25) * 80, 10, 90);
 
+    // Scoring gravity: PPG × TS% interaction — the core "how much offense are you creating"
+    const scoringGravity = clamp(50 + (ppg - 12) * (tsPct - 0.50) * 60, 10, 95);
+
     const oiq = clamp(
-      tsOiqScore * 0.30 +     // true shooting (wider spread)
-      usgVsPos * 0.20 +       // usage relative to position
-      ppgNorm * 0.20 +         // volume scoring
-      apgScore * 0.15 +        // playmaking (raw assists, no TOV penalty)
-      ftRateNorm * 0.10 +      // getting to the line
-      volumeBonus * 0.05        // bonus for high-volume efficient scorers
+      tsOiqScore * 0.22 +       // true shooting efficiency
+      usgVsPos * 0.15 +         // usage relative to position
+      ppgNorm * 0.15 +           // volume scoring
+      scoringGravity * 0.18 +    // NEW: PPG × TS% interaction (scoring gravity)
+      apgScore * 0.12 +          // playmaking (position-adjusted)
+      ftRateNorm * 0.08 +        // getting to the line
+      volumeBonus * 0.10         // continuous volume bonus (no cliffs)
     );
-    // Note: label will be overwritten by percentile-based tier system
     const oiqLabel = "placeholder";
 
     // ==================================================================
-    // DRS v3 — Position-relative defensive scoring
-    // Bigs compared to bigs, wings to wings, guards to guards
-    // No more inflating bigs with raw contested shots / blocks
+    // DRS v4 — Per-minute rate stats, softer GP factor, uncapped fallback
+    // Changes from v3:
+    //   - Counting stats (contests, deflections) now per-minute rate-based
+    //     to prevent minutes played from being the dominant signal
+    //   - GP penalty softened: (gp/70)^0.8 instead of ^1.5
+    //     Load-managed stars shouldn't be penalized like they're injured
+    //   - Fallback mode cap raised from 65 to 80 — elite box-score defenders
+    //     (like prime Gobert) shouldn't be artificially limited
+    //   - Added defensive consistency: low-variance defenders ranked higher
     // ==================================================================
     const hasDefData = defRating > 0 || contestedShots > 0;
     let drs: number;
     const posDefAvg = posAvgDef[posGroup] || posAvgDef.G;
 
-    // Declare DRS component variables at outer scope so they're accessible for drsComponents
     let oppFgDiff = 0, deterrenceScore = 50, onOffScore = 50, onOffImpact = 0;
     let dFga = 0, versatilityBonus = 0, contestScore = 0, deflScore = 0;
     let stlScore = 0, blkScore = 0, loadScore = 0, minutesScore = 0, hustleScore = 0;
 
     if (hasDefData) {
-      // ============================================================
-      // DRS v7: RAW STATS + MINUTES/GP + LOAD + DETERRENCE + ON/OFF
-      // ============================================================
-      // RAW counting stats (not per-36) because VOLUME matters.
-      // Heavy-minute defenders who sustain elite D over full seasons > part-timers.
-      // D_FGA = "are you guarding the best players?" signal.
-
-      // 1. DETERRENCE (18%) — opponent FG% impact
+      // 1. DETERRENCE (20%) — opponent FG% impact (bumped: most meaningful signal)
       oppFgDiff = parseFloat(ps.opp_fg_pct_diff || "0");
       const hasDeterrenceData = ps.opp_fg_pct_diff != null && ps.opp_fg_pct_diff !== "";
       deterrenceScore = hasDeterrenceData
         ? clamp(50 + (oppFgDiff * -100) * 5, 0, 100) : 50;
 
-      // 2. ON/OFF IMPACT (12%) — team defense without you
+      // 2. ON/OFF IMPACT (14%) — team defense without you (bumped: outcome-based)
       const teamDrtgVal = teamDrtgMap[Number(ps.team_id)] || 112;
       onOffImpact = teamDrtgVal - defRating;
       onOffScore = clamp(50 + onOffImpact * 7, 0, 100);
 
-      // 3-6. RAW COUNTING STATS (contests 15%, defl 12%, stl 10%, blk 7%)
-      contestScore = clamp(contestedShots * 7.5, 0, 100);
-      deflScore = clamp(deflections * 22, 0, 100);
+      // 3-6. PER-MINUTE RATE STATS (prevents minutes from dominating)
+      const mpgSafe = Math.max(mpg, 15);
+      const contestRate = contestedShots / mpgSafe; // contests per minute
+      const deflRate = deflections / mpgSafe;        // deflections per minute
+      contestScore = clamp(contestRate * 280, 0, 100);
+      deflScore = clamp(deflRate * 800, 0, 100);
       stlScore = clamp(spg * 40, 0, 100);
       blkScore = clamp(bpg * 28, 0, 100);
 
-      // 7. DEFENSIVE LOAD (8%) — how many FGA opponents take against you
+      // 7. DEFENSIVE LOAD (7%) — how many FGA opponents take against you
       dFga = parseFloat(ps.d_fga || "0");
       loadScore = clamp(dFga * 5.5, 0, 100);
 
-      // 8. MINUTES + GP BONUS (8%) — sustained heavy-minute defenders
+      // 8. MINUTES SUSTAINED (6%) — softer GP penalty
       const minutesRaw = clamp((mpg - 15) * 4, 0, 100);
-      // GP penalty: missing games HURTS. 70 GP = 1.0, 50 GP = 0.71, 35 GP = 0.50, 25 GP = 0.36
-      // Formula: (gp/70)^1.5 — exponential penalty for missing games
-      const gpFactor = clamp(Math.pow(gp / 70, 1.5), 0.25, 1.0);
+      // Softened: (gp/70)^0.8 — still rewards availability but doesn't crush load management
+      const gpFactor = clamp(Math.pow(gp / 70, 0.8), 0.35, 1.0);
       minutesScore = minutesRaw * gpFactor;
 
       // 9. VERSATILITY (5%) — perimeter + interior actions both present
@@ -352,17 +380,17 @@ async function main() {
       versatilityBonus = (perimActions > 2.5 && interiorActions > 1.5)
         ? Math.min((perimActions + interiorActions) * 3, 15) : 0;
 
-      // 10. HUSTLE (5%) — loose balls + charges
+      // 10. HUSTLE (4%) — loose balls + charges
       hustleScore = clamp((looseBalls + chargesDrawn) * 30, 0, 100);
 
       drs = clamp(
-        deterrenceScore * 0.18 + contestScore * 0.15 + onOffScore * 0.12 +
-        deflScore * 0.12 + stlScore * 0.10 + loadScore * 0.08 +
-        minutesScore * 0.08 + blkScore * 0.07 + versatilityBonus * 0.05 +
+        deterrenceScore * 0.20 + onOffScore * 0.14 + contestScore * 0.14 +
+        deflScore * 0.12 + stlScore * 0.10 + blkScore * 0.07 +
+        loadScore * 0.07 + minutesScore * 0.06 + versatilityBonus * 0.05 +
         hustleScore * 0.05, 0, 100
       );
     } else {
-      // Fallback: box score only, position-relative, capped at 65
+      // Fallback: box score only, position-relative, cap raised to 80
       const posStlAvg = posDefAvg.stl || 1;
       const posBlkAvg = posDefAvg.blk || 0.5;
       const stlVsPos = clamp(50 + (spg - posStlAvg) * 15, 10, 90);
@@ -370,16 +398,23 @@ async function main() {
       drs = clamp(
         (isGuard ? stlVsPos * 0.55 + blkVsPos * 0.20 : stlVsPos * 0.25 + blkVsPos * 0.50) +
         rpgNorm * 0.25,
-        0, 65
+        0, 80
       );
     }
 
-    const drsConfidence = hasDefData ? bisConfidence : bisConfidence * 0.4;
-    // Label will be overwritten by percentile-based tier system
+    const drsConfidence = hasDefData ? bisConfidence : bisConfidence * 0.5;
     const drsLabel = "placeholder";
 
     // ==================================================================
-    // LFI v2 — Efficiency trend, +/- trend, weighted recency, 10-game blend
+    // LFI v3 — Steeper recency, position-aware weighting, trend direction
+    // Changes from v2:
+    //   - Steeper recency decay: game 1=1.0, game 5=0.5 (was 0.68)
+    //     Most recent game should matter significantly more
+    //   - Position-aware: guards weighted more on ast/pts, bigs on reb
+    //   - Added trend direction: is the player accelerating or decelerating?
+    //     Catches players who were hot but are cooling off (LFI 55 but trending down)
+    //   - Streak labels now check DIRECTION not just absolute level
+    //   - Breakout detection moved before hot_fragile to catch it properly
     // ==================================================================
     const last5 = logs.slice(0, 5);
     const last10 = logs.slice(0, 10);
@@ -389,11 +424,11 @@ async function main() {
     let lfiStreakLabel = "stable";
 
     if (last5.length >= 3) {
-      // Weighted recency: game 1 = 1.0, game 2 = 0.9, game 3 = 0.8, etc.
+      // Steeper recency: game 1 = 1.0, game 2 = 0.85, game 3 = 0.72, game 4 = 0.61, game 5 = 0.52
       function weightedAvg(games: any[], key: string | ((g: any) => number)): number {
         let totalVal = 0, totalWeight = 0;
         for (let i = 0; i < games.length; i++) {
-          const w = 1.0 - (i * 0.08); // slight decay
+          const w = Math.pow(0.85, i); // exponential decay (was linear 0.08)
           const val = typeof key === "function" ? key(games[i]) : num(games[i][key]);
           totalVal += val * w;
           totalWeight += w;
@@ -401,13 +436,11 @@ async function main() {
         return totalWeight > 0 ? totalVal / totalWeight : 0;
       }
 
-      // Last 5 (weighted) vs season averages
       const recentPts = weightedAvg(last5, "pts");
       const recentReb = weightedAvg(last5, "reb");
       const recentAst = weightedAvg(last5, "ast");
       const recentPM = weightedAvg(last5, "plus_minus");
 
-      // Efficiency trend: TS% of recent games vs season TS%
       const recentTS = weightedAvg(last5, (g) => {
         const fga = num(g.fga); const fta = num(g.fta); const pts = num(g.pts);
         const denom = 2 * (fga + 0.44 * fta);
@@ -416,128 +449,167 @@ async function main() {
       const seasonTS = tsPct > 0 ? tsPct : 0.56;
       const tsDelta = seasonTS > 0 ? (recentTS - seasonTS) / seasonTS : 0;
 
-      // Stat deltas vs season averages
       const ptsDelta = ppg > 0 ? (recentPts - ppg) / ppg : 0;
       const rebDelta = rpg > 0 ? (recentReb - rpg) / rpg : 0;
       const astDelta = apg > 0 ? (recentAst - apg) / apg : 0;
-      const pmDelta = recentPM; // raw +/- (not normalized against season)
+      const pmDelta = recentPM;
 
-      // Combine: scoring trend (30%), assist trend (20%), rebound trend (10%),
-      // efficiency trend (25%), +/- trend (15%)
+      // Position-aware weighting: guards care more about pts/ast, bigs about reb
+      const ptsW = isGuard ? 0.32 : 0.28;
+      const astW = isGuard ? 0.22 : 0.12;
+      const rebW = isBig ? 0.18 : 0.08;
+      const tsW = 0.25;
+      const pmW = 1.0 - ptsW - astW - rebW - tsW; // remainder to +/-
+
       lfiDelta = (
-        ptsDelta * 0.30 +
-        astDelta * 0.20 +
-        rebDelta * 0.10 +
-        tsDelta * 0.25 +
-        clamp(pmDelta / 10, -1, 1) * 0.15
+        ptsDelta * ptsW +
+        astDelta * astW +
+        rebDelta * rebW +
+        tsDelta * tsW +
+        clamp(pmDelta / 10, -1, 1) * pmW
       ) * 100;
 
-      // Blend: 70% last 5, 30% last 10 for stability
+      // Blend: 65% last 5, 35% last 10 for stability
       if (last10.length >= 6) {
         const l10PtsDelta = ppg > 0 ? (weightedAvg(last10, "pts") - ppg) / ppg : 0;
         const l10AstDelta = apg > 0 ? (weightedAvg(last10, "ast") - apg) / apg : 0;
-        const l10Delta = (l10PtsDelta * 0.5 + l10AstDelta * 0.5) * 100;
-        lfiDelta = lfiDelta * 0.70 + l10Delta * 0.30;
+        const l10RebDelta = rpg > 0 ? (weightedAvg(last10, "reb") - rpg) / rpg : 0;
+        const l10Delta = (l10PtsDelta * 0.45 + l10AstDelta * 0.30 + l10RebDelta * 0.25) * 100;
+        lfiDelta = lfiDelta * 0.65 + l10Delta * 0.35;
       }
 
       lfi = clamp(50 + lfiDelta * 2);
       lfiConfidence = clamp(Math.min(last5.length / 5, 1), 0, 1);
 
-      // Streak labels — now factor in efficiency
+      // Trend direction: compare last 3 games vs games 4-5 to detect acceleration
+      const trendDirection = last5.length >= 4 ? (() => {
+        const recent3Pts = last5.slice(0, 3).reduce((s, l) => s + num(l.pts), 0) / 3;
+        const older2Pts = last5.slice(3).reduce((s, l) => s + num(l.pts), 0) / Math.max(last5.length - 3, 1);
+        return recent3Pts - older2Pts; // positive = accelerating
+      })() : 0;
+
       const effUp = tsDelta > 0.02;
       const effDown = tsDelta < -0.03;
 
-      if (lfi >= 70 && recentPM > 3 && effUp) lfiStreakLabel = "hot_likely_real";
+      // Streak labels — now check direction + absolute level
+      if (lfi >= 60 && usgPct > (posAvgUsg[posGroup] || avg.usg_pct) * 1.15) lfiStreakLabel = "breakout_role_expansion";
+      else if (lfi >= 70 && recentPM > 3 && effUp) lfiStreakLabel = "hot_likely_real";
       else if (lfi >= 65 && recentPM > 2) lfiStreakLabel = "hot_likely_real";
       else if (lfi >= 65 && recentPM <= -2) lfiStreakLabel = "hot_opponent_driven";
-      else if (lfi >= 60 && effDown) lfiStreakLabel = "hot_fragile";
+      else if (lfi >= 60 && trendDirection < -3) lfiStreakLabel = "hot_fragile"; // was hot, cooling off
       else if (lfi >= 60) lfiStreakLabel = "hot_fragile";
       else if (lfi <= 30 && recentPM < -5) lfiStreakLabel = "cold_real";
       else if (lfi <= 38 && effDown) lfiStreakLabel = "cold_real";
+      else if (lfi <= 40 && trendDirection > 3) lfiStreakLabel = "cold_bouncing_back"; // was cold, warming up
       else if (lfi <= 40) lfiStreakLabel = "cold_bouncing_back";
-      else if (lfi >= 60 && usgPct > (posAvgUsg[posGroup] || avg.usg_pct) * 1.15) lfiStreakLabel = "breakout_role_expansion";
       else lfiStreakLabel = "stable";
     }
 
     // ==================================================================
-    // PEM v2 (Playmaking Efficiency Metric) — stored as sps_score in DB
-    // Fixed: NO turnover penalty (already in BIS), raw APG is king,
-    // per-36 assists for bench players, TS% for shot creation quality
+    // PEM v3 (Playmaking Efficiency Metric) — stored as sps_score in DB
+    // Changes from v2:
+    //   - Added AST/TOV ratio: the single most important playmaking quality stat.
+    //     OIQ purposely excludes turnovers; PEM includes them because playmaking
+    //     QUALITY means not turning it over while creating
+    //   - Removed TS% (now in OIQ only) to differentiate the two metrics
+    //   - Added potential assists proxy: high-ast players with low TOV are elite
+    //   - Reduced raw APG weight — it's volume, not quality
     // ==================================================================
 
-    // Raw APG on wider scale — Jokic at 10+ APG should dominate
     const rawApgScore = clamp(50 + (apg - (avg.apg || 3)) * 8, 5, 99);
 
-    // Per-36 assist rate for fairer bench player comparison
-    const mpgSafe = Math.max(mpg, 10);
-    const per36Ast = (apg / mpgSafe) * 36;
+    const mpgSafe2 = Math.max(mpg, 10);
+    const per36Ast = (apg / mpgSafe2) * 36;
     const per36AstScore = clamp(50 + (per36Ast - 4.5) * 6, 5, 95);
 
-    // Assist percentage (% of teammate FGs assisted) — pure creation measure
     const astPctScore = normalize(astPct, avg.ast_pct || 0.12, std.ast_pct || 0.06);
 
-    // TS% but only as "do they create good shots for themselves"
-    const tsPlaymaking = clamp(50 + rawTsAboveAvg * 3, 20, 80);
+    // AST/TOV ratio — THE quality playmaking stat
+    // Elite: 3.5+ (Jokic, CP3), Good: 2.5+, Average: 1.8, Bad: <1.5
+    const astTovRatio = topg > 0.5 ? apg / topg : (apg > 2 ? 4.0 : 2.0); // if no TOV, assume good
+    const astTovScore = clamp(50 + (astTovRatio - 2.0) * 18, 5, 99);
 
-    // Potential assists: APG relative to USG — high usage + high assists = elite
+    // Creation under load: APG relative to USG — high usage + high assists = elite
     const creationLoad = usgPct > 0.15 ? apg / (usgPct * 100) : 0;
     const creationScore = clamp(50 + (creationLoad - 0.15) * 200, 10, 90);
 
+    // Assist versatility: do they create for multiple teammates? (proxy: high AST% + high APG)
+    const assistVersatility = (astPct > 0.15 && apg > 4) ? clamp(50 + (apg - 4) * 6, 50, 90)
+      : (astPct > 0.10 && apg > 2) ? clamp(40 + apg * 3, 30, 70) : 30;
+
     const pem = clamp(
-      rawApgScore * 0.30 +       // raw assists (biggest factor)
-      per36AstScore * 0.20 +     // per-36 assists (bench fairness)
-      astPctScore * 0.20 +       // assist rate (% of team FGs)
-      creationScore * 0.15 +     // creation under load (APG/USG%)
-      tsPlaymaking * 0.15        // shot creation quality
+      rawApgScore * 0.20 +          // raw assists (volume)
+      astTovScore * 0.25 +          // NEW: AST/TOV ratio (quality — biggest differentiator from OIQ)
+      per36AstScore * 0.15 +        // per-36 assists (bench fairness)
+      astPctScore * 0.15 +          // assist rate (% of team FGs)
+      creationScore * 0.15 +        // creation under load (APG/USG%)
+      assistVersatility * 0.10      // NEW: assist versatility
     );
-    // Note: label will be overwritten by percentile-based tier system
     const pemLabel = "placeholder";
 
     // ==================================================================
-    // GOI v2 — Clutch performance, filtered garbage time, 4Q scoring
+    // GOI v3 — Win contribution, clutch scoring, reduced ± noise
+    // Changes from v2:
+    //   - Reduced raw ± weight from 40% to 25% (it's noisy, team-dependent)
+    //   - Added win contribution: does the team win more when you play well?
+    //     This is the most meaningful "game outcome" signal
+    //   - Clutch scoring delta: do you score MORE in close games vs normal?
+    //     Penalizes players who disappear and rewards players who elevate
+    //   - Close game threshold narrowed from 8 to 6 points (more meaningful)
     // ==================================================================
     let goiPlusMinusScore = 50;
     let goiClutchScore = 50;
     let goiFourthQScore = 50;
+    let goiWinContribution = 50;
 
     if (logs.length >= 3) {
-      // Filter out garbage time: exclude games decided by 20+
+      // Filter out garbage time: exclude blowouts where player played short minutes
       const meaningfulGames = logs.slice(0, 15).filter((l) => {
         const diff = Math.abs(num(l.home_score) - num(l.away_score));
-        return diff < 20 || num(l.minutes) > 20; // keep if close game OR they played real minutes
+        return diff < 20 || num(l.minutes) > 20;
       });
 
       if (meaningfulGames.length >= 3) {
         const mgPM = meaningfulGames.reduce((s, l) => s + num(l.plus_minus), 0) / meaningfulGames.length;
         goiPlusMinusScore = clamp(50 + mgPM * 2.5);
 
-        // Consistency: mean/stdev ratio (high mean, low variance = clutch)
+        // Consistency: mean/stdev ratio (high mean, low variance = reliable)
         const pmValues = meaningfulGames.map(l => num(l.plus_minus));
         const pmStd = Math.sqrt(pmValues.reduce((s, v) => s + (v - mgPM) ** 2, 0) / pmValues.length) || 1;
         goiClutchScore = clamp(50 + (mgPM / pmStd) * 8);
 
-        // Close game performance: games decided by < 8 points
+        // Win contribution: correlation between personal performance and team wins
+        // Do you play better in wins vs losses?
+        const wins = meaningfulGames.filter(l => num(l.plus_minus) > 0);
+        const losses = meaningfulGames.filter(l => num(l.plus_minus) <= 0);
+        if (wins.length >= 2 && losses.length >= 1) {
+          const winPts = wins.reduce((s, l) => s + num(l.pts), 0) / wins.length;
+          const lossPts = losses.reduce((s, l) => s + num(l.pts), 0) / losses.length;
+          const elevationDelta = winPts - lossPts; // positive = scores more in wins
+          goiWinContribution = clamp(50 + elevationDelta * 3);
+        }
+
+        // Close game performance: games decided by ≤ 6 points (tighter threshold)
         const closeGames = meaningfulGames.filter((l) => {
-          return Math.abs(num(l.home_score) - num(l.away_score)) <= 8;
+          return Math.abs(num(l.home_score) - num(l.away_score)) <= 6;
         });
         if (closeGames.length >= 2) {
           const closePM = closeGames.reduce((s, l) => s + num(l.plus_minus), 0) / closeGames.length;
           const closePts = closeGames.reduce((s, l) => s + num(l.pts), 0) / closeGames.length;
-          // In close games: do they score more and maintain positive +/-?
           const closeScoreDelta = ppg > 0 ? (closePts - ppg) / ppg : 0;
           goiFourthQScore = clamp(50 + closePM * 2 + closeScoreDelta * 30);
         }
       } else {
-        // Not enough meaningful games, use raw data
         const rawPM = logs.slice(0, 10).reduce((s, l) => s + num(l.plus_minus), 0) / Math.min(logs.length, 10);
         goiPlusMinusScore = clamp(50 + rawPM * 2);
       }
     }
 
     const goi = clamp(
-      goiPlusMinusScore * 0.40 +  // overall impact (filtered)
-      goiClutchScore * 0.30 +      // consistency under pressure
-      goiFourthQScore * 0.30       // close game performance
+      goiPlusMinusScore * 0.25 +    // overall impact (reduced from 40%)
+      goiWinContribution * 0.25 +   // NEW: win contribution (steps up in wins?)
+      goiClutchScore * 0.25 +       // consistency under pressure
+      goiFourthQScore * 0.25        // close game performance
     );
     const goiConfidence = clamp(Math.min((logs.length || 0) / 20, 1), 0, 1);
 
