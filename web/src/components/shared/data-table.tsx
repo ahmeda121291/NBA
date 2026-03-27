@@ -401,26 +401,30 @@ export function DataTable<T>({
       <div className="glass-card rounded-lg overflow-hidden">
         <div className="relative">
           {/* Mobile scroll hint — right edge gradient */}
-          <div className="absolute right-0 top-0 bottom-0 w-6 pointer-events-none z-20 bg-gradient-to-l from-[#0d1117] to-transparent sm:hidden" />
+          <div className="absolute right-0 top-0 bottom-0 w-6 pointer-events-none z-20 bg-gradient-to-l from-[rgba(14,18,30,0.85)] to-transparent sm:hidden" />
         <div className="overflow-x-auto max-h-[80vh] overflow-y-auto">
           {/* Header row */}
           <div
-            className="grid border-b border-white/[0.06] sticky top-0 z-10 bg-[#0d1117]"
-            style={{ gridTemplateColumns: gridTemplate }}
+            className="grid border-b border-white/[0.06] sticky top-0 z-10"
+            style={{
+              gridTemplateColumns: gridTemplate,
+              background: "linear-gradient(145deg, rgba(14, 18, 30, 0.98) 0%, rgba(8, 11, 22, 0.95) 100%)",
+              backdropFilter: "blur(16px)",
+            }}
           >
             {visCols.map((col) => {
               const alignCls = col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left";
               return (
                 <div
                   key={col.key}
-                  className={`px-3 py-2.5 text-[11px] uppercase tracking-wider font-semibold text-text-muted/70 whitespace-nowrap ${alignCls} ${
+                  className={`px-3 py-2.5 text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap ${alignCls} ${
                     col.sortable ? "cursor-pointer select-none hover:text-indigo-400 transition-colors" : ""
                   }`}
                   onClick={() => col.sortable && handleSort(col.key)}
                 >
                   {col.isMetric && col.metricKey ? (
                     <MetricTooltip metricKey={col.metricKey}>
-                      <span className="text-indigo-400/80">{col.label}</span>
+                      <span className="text-indigo-400/70">{col.label}</span>
                     </MetricTooltip>
                   ) : (
                     col.label
@@ -439,7 +443,7 @@ export function DataTable<T>({
           {sortedData.map((row, i) => (
             <div
               key={i}
-              className="grid border-b border-white/[0.03] table-row-hover"
+              className="grid border-b border-white/[0.03] table-row-hover items-center"
               style={{ gridTemplateColumns: gridTemplate }}
             >
               {visCols.map((col) => {
@@ -447,7 +451,7 @@ export function DataTable<T>({
                 return (
                   <div
                     key={col.key}
-                    className={`px-3 py-2.5 text-sm whitespace-nowrap overflow-hidden text-ellipsis ${alignCls}`}
+                    className={`px-3 py-2 text-sm whitespace-nowrap overflow-hidden text-ellipsis ${alignCls}`}
                   >
                     {col.render(row, i)}
                   </div>
@@ -457,14 +461,14 @@ export function DataTable<T>({
           ))}
 
           {sortedData.length === 0 && (
-            <div className="px-3 py-8 text-center text-text-muted">
+            <div className="px-3 py-8 text-center text-text-muted/60">
               No data matches your filters.
             </div>
           )}
         </div>
         </div>
       </div>
-      <p className="text-[10px] text-text-muted/40 mt-2 font-stat text-right">
+      <p className="text-[10px] text-text-muted/30 mt-2 font-stat text-right">
         {sortedData.length} of {data.length} results
       </p>
     </div>
