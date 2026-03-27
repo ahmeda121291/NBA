@@ -178,8 +178,8 @@ export async function getPlayerVsTeam(
 export async function getGameKeyMatchups(
   gameId: number
 ): Promise<{
-  home_matchups: (PlayerMatchupSplit & { player_name: string; player_id: number; bis_score: number | null })[];
-  away_matchups: (PlayerMatchupSplit & { player_name: string; player_id: number; bis_score: number | null })[];
+  home_matchups: (PlayerMatchupSplit & { player_name: string; player_id: number; bis_score: number | null; rda_score: number | null; position: string | null })[];
+  away_matchups: (PlayerMatchupSplit & { player_name: string; player_id: number; bis_score: number | null; rda_score: number | null; position: string | null })[];
 }> {
   // Get the teams in this game
   const gameRows = await db.execute(sql`
@@ -194,7 +194,7 @@ export async function getGameKeyMatchups(
   async function getTeamMatchups(teamId: number, opponentId: number) {
     const rows = await db.execute(sql`
       WITH team_players AS (
-        SELECT p.id, p.full_name, pms.bis_score
+        SELECT p.id, p.full_name, p.position, pms.bis_score, pms.rda_score
         FROM players p
         JOIN player_season_stats pss ON p.id = pss.player_id
         LEFT JOIN player_metric_snapshots pms ON pms.player_id = p.id
@@ -206,7 +206,9 @@ export async function getGameKeyMatchups(
         SELECT
           tp.id AS player_id,
           tp.full_name AS player_name,
+          tp.position,
           tp.bis_score,
+          tp.rda_score,
           COUNT(*) AS games,
           AVG(pgl.pts) AS avg_pts,
           AVG(pgl.reb) AS avg_reb,
@@ -227,7 +229,7 @@ export async function getGameKeyMatchups(
             WHEN g.home_team_id = pgl.team_id THEN g.away_team_id
             ELSE g.home_team_id
           END = ${opponentId}
-        GROUP BY tp.id, tp.full_name, tp.bis_score
+        GROUP BY tp.id, tp.full_name, tp.position, tp.bis_score, tp.rda_score
       ),
       season AS (
         SELECT player_id, ppg, rpg, apg
@@ -247,7 +249,9 @@ export async function getGameKeyMatchups(
     return rows.map((r: any) => ({
       player_id: Number(r.player_id),
       player_name: String(r.player_name),
+      position: r.position ? String(r.position) : null,
       bis_score: r.bis_score ? Number(r.bis_score) : null,
+      rda_score: r.rda_score ? Number(r.rda_score) : null,
       opponent_team_id: opponentId,
       opponent_abbr: "",
       opponent_name: "",

@@ -6,6 +6,7 @@ import { getTodaysGamesWithProjections, getHottestPlayers, getTopPlayersWithMetr
 import { computeLiveProjections } from "@/lib/projections";
 import { tierClass, getStreakBadge } from "@/lib/formatting";
 import { CURRENT_SEASON } from "@/lib/constants";
+import { PicksCard } from "@/components/shared/picks-card";
 
 export const dynamic = "force-dynamic";
 
@@ -295,6 +296,37 @@ export default async function DashboardPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Tonight's Picks — shareable card */}
+      {games.some((g: any) => g.win_prob_home != null && g.status !== "final") && (
+        <section>
+          <div className="section-header mb-3 flex items-center gap-2.5">
+            <TrendingUp className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">Tonight&apos;s Picks</span>
+            <span className="text-[9px] text-text-muted/40 ml-auto">Save as image to share</span>
+          </div>
+          <PicksCard
+            slateDate={slateDate || today}
+            games={games
+              .filter((g: any) => g.win_prob_home != null && g.status !== "final")
+              .map((g: any) => ({
+                id: Number(g.id),
+                away_abbr: String(g.away_abbr),
+                home_abbr: String(g.home_abbr),
+                away_city: String(g.away_city || g.away_abbr),
+                home_city: String(g.home_city || g.home_abbr),
+                win_prob_home: Number(g.win_prob_home),
+                proj_score_home: g.proj_score_home ? Number(g.proj_score_home) : null,
+                proj_score_away: g.proj_score_away ? Number(g.proj_score_away) : null,
+                pick_abbr: String(g.pick_abbr || (Number(g.win_prob_home) >= 0.5 ? g.home_abbr : g.away_abbr)),
+                confidence: g.confidence ? Number(g.confidence) : null,
+                key_reasons: g.key_reasons
+                  ? (typeof g.key_reasons === "string" ? JSON.parse(g.key_reasons) : Array.isArray(g.key_reasons) ? g.key_reasons : null)
+                  : null,
+              }))}
+          />
+        </section>
       )}
 
       {/* Tonight's Slate */}

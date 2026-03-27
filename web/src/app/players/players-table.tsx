@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Image from "next/image";
 import { DataTable, Column, ViewPreset } from "@/components/shared/data-table";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
-import { tierClass, num, fmt, pct } from "@/lib/formatting";
+import { tierClass, num, fmt, pct, consistencyInfo, consistencyScore } from "@/lib/formatting";
 
 interface Props {
   players: any[];
@@ -90,6 +90,19 @@ export function PlayersTable({ players }: Props) {
       key: "goi", label: "GOI", align: "right", sortable: true, isMetric: true, metricKey: "goi", defaultVisible: false, width: "60px",
       sortValue: (r) => num(r.goi_score),
       render: (r) => <span className={`font-stat text-[13px] ${tierClass(num(r.goi_score))}`}>{fmt(r.goi_score, 0)}</span>,
+    },
+    {
+      key: "con", label: "CON", align: "right", sortable: true, isMetric: true, metricKey: "con", defaultVisible: false, width: "80px",
+      sortValue: (r) => consistencyScore(r.pts_stddev != null ? Number(r.pts_stddev) : null) ?? -1,
+      render: (r) => {
+        const info = consistencyInfo(r.pts_stddev != null ? Number(r.pts_stddev) : null, r.log_count != null ? Number(r.log_count) : null);
+        if (info.shortLabel === "—") return <span className="text-text-muted/30 text-[11px]">—</span>;
+        return (
+          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${info.cls}`}>
+            {info.shortLabel}
+          </span>
+        );
+      },
     },
     // Traditional stats — consistent sizing
     {
@@ -179,7 +192,7 @@ export function PlayersTable({ players }: Props) {
     {
       key: "courtvision",
       label: "CourtVision",
-      columns: ["rank", "name", "pos", "gp", "bis", "lfi", "drs", "rda", "sps", "goi"],
+      columns: ["rank", "name", "pos", "gp", "bis", "lfi", "drs", "rda", "sps", "goi", "con"],
     },
     {
       key: "traditional",
