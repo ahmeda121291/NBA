@@ -8,7 +8,7 @@ import { getPlayerWithMetrics, getPlayerGameLogs } from "@/lib/db/queries";
 import { getPlayerMatchupSplits } from "@/lib/db/queries/matchups";
 import { generateScoutingReport } from "@/lib/scouting";
 import { notFound } from "next/navigation";
-import { tierClass, tierLabel, tierBorder, getStreakBadge } from "@/lib/formatting";
+import { tierClass, tierLabel, tierBorder, getStreakBadge, consistencyInfo } from "@/lib/formatting";
 import { CURRENT_SEASON } from "@/lib/constants";
 import { PerformanceTrendChart } from "@/components/ui/performance-trend-chart";
 import { FavoritePlayerButton } from "@/components/shared/favorite-button";
@@ -51,6 +51,15 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   const vfmLabel = vfm !== null ? (vfm >= underpaidThreshold ? "Great Value" : vfm >= fairThreshold ? "Fair Value" : "Overpaid") : null;
   const vfmLabelCls = vfm !== null ? (vfm >= underpaidThreshold ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : vfm >= fairThreshold ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20") : "";
 
+  // Consistency score computed from fetched game logs (no extra query)
+  const ptsSamples = gameLogs.map((g: any) => Number(g.pts)).filter((v) => !isNaN(v) && v > 0);
+  const ptsStddev = ptsSamples.length >= 5 ? (() => {
+    const mean = ptsSamples.reduce((s, v) => s + v, 0) / ptsSamples.length;
+    const variance = ptsSamples.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / ptsSamples.length;
+    return Math.sqrt(variance);
+  })() : null;
+  const consInfo = consistencyInfo(ptsStddev, ptsSamples.length);
+
   const metrics = [
     { key: "BIS", label: "Baseline Impact Score", score: bis, icon: Activity, desc: "Overall per-game value blending offense, defense, and efficiency" },
     { key: "LFI", label: "Live Form Index", score: lfi, icon: Flame, desc: "Recent form vs season baseline — momentum and trajectory" },
@@ -80,6 +89,11 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
               <h1 className="text-3xl font-bold tracking-tight gradient-text">{p.full_name}</h1>
               <FavoritePlayerButton playerId={Number(id)} />
               {(() => { const sb = getStreakBadge(p.lfi_streak_label); return sb ? <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${sb.cls}`}>{sb.text}</span> : null; })()}
+              {consInfo.shortLabel !== "—" && (
+                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${consInfo.cls}`}>
+                  {consInfo.shortLabel}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-1.5">
               <div className="relative h-4 w-4">
@@ -161,6 +175,23 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                 <p className="text-[10px] text-text-muted/40 mt-1.5 leading-snug">{m.desc}</p>
               </div>
             ))}
+            {/* Consistency Card */}
+            {ptsStddev !== null && (
+              <div className={`p-4 rounded-lg border ${consInfo.cls.includes("emerald") ? "border-emerald-500/20 bg-emerald-500/[0.04]" : consInfo.cls.includes("sky") ? "border-sky-500/20 bg-sky-500/[0.04]" : consInfo.cls.includes("amber") ? "border-amber-500/20 bg-amber-500/[0.04]" : "border-rose-500/20 bg-rose-500/[0.04]"} relative`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="h-3.5 w-3.5 text-text-muted/60" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted/80">CON</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`font-bold text-[15px] uppercase tracking-wide ${consInfo.dotCls}`}>
+                    {consInfo.label}
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-muted/40 mt-1.5 leading-snug font-stat">
+                  σ {ptsStddev.toFixed(1)} pts · last {ptsSamples.length}G
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

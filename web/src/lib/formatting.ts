@@ -61,6 +61,43 @@ export function pct(v: unknown, decimals = 1): string {
   return isNaN(n) ? "—" : (n * 100).toFixed(decimals);
 }
 
+// ---- Consistency / Reliability ----
+
+export interface ConsistencyInfo {
+  label: string;
+  shortLabel: string;
+  cls: string;       // badge CSS (bg + text + border)
+  dotCls: string;    // just the text/dot color
+}
+
+/**
+ * Given the standard deviation of a player's per-game pts over recent logs,
+ * returns the consistency tier. Lower stddev = more consistent.
+ * Thresholds tuned to NBA scoring distributions (~15-30 PPG starters).
+ */
+export function consistencyInfo(stddev: number | null, logCount: number | null): ConsistencyInfo {
+  if (stddev == null || (logCount != null && logCount < 5)) {
+    return { label: "N/A", shortLabel: "—", cls: "text-text-muted/40", dotCls: "text-text-muted/40" };
+  }
+  if (stddev < 4) {
+    return { label: "Rock Solid", shortLabel: "SOLID", cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", dotCls: "text-emerald-400" };
+  }
+  if (stddev < 7) {
+    return { label: "Steady", shortLabel: "STEADY", cls: "text-sky-400 bg-sky-500/10 border-sky-500/20", dotCls: "text-sky-400" };
+  }
+  if (stddev < 11) {
+    return { label: "Streaky", shortLabel: "STREAKY", cls: "text-amber-400 bg-amber-500/10 border-amber-500/20", dotCls: "text-amber-400" };
+  }
+  return { label: "Boom or Bust", shortLabel: "VOLATILE", cls: "text-rose-400 bg-rose-500/10 border-rose-500/20", dotCls: "text-rose-400" };
+}
+
+/** Convert pts_stddev to a 0-100 reliability score (100 = most consistent) */
+export function consistencyScore(stddev: number | null): number | null {
+  if (stddev == null) return null;
+  // stddev 0 → 100, stddev 4 → 72, stddev 8 → 44, stddev 12 → 16
+  return Math.max(0, Math.round(100 - stddev * 7));
+}
+
 // ---- Streak Badges ----
 
 export interface StreakBadgeInfo {

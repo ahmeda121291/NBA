@@ -789,7 +789,14 @@ export async function getAllPlayersWithFullStats(limit = 200) {
       pms.goi_score,
       t.conference AS team_conference,
       pi.status AS injury_status,
-      pi.injury_type AS injury_type
+      pi.injury_type AS injury_type,
+      (SELECT ROUND(STDDEV(pgl.pts)::numeric, 2)
+       FROM player_game_logs pgl
+       WHERE pgl.player_id = p.id AND pgl.season_id = pss.season_id
+      ) AS pts_stddev,
+      (SELECT COUNT(*) FROM player_game_logs pgl
+       WHERE pgl.player_id = p.id AND pgl.season_id = pss.season_id
+      ) AS log_count
     FROM players p
     JOIN player_season_stats pss ON p.id = pss.player_id
     JOIN teams t ON pss.team_id = t.id

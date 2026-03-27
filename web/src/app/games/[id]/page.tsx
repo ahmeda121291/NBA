@@ -175,6 +175,31 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
     ? (homeWon && projWinnerId === Number(g.home_team_id)) || (awayWon && projWinnerId === Number(g.away_team_id))
     : null;
 
+  // Mismatch Detector: high-OIQ players vs weak opponent DRS
+  // Home players (high OIQ) vs away team's defense (awayDRS)
+  // Away players (high OIQ) vs home team's defense (homeDRS)
+  type MismatchEntry = { player_id: number; player_name: string; position: string | null; oiq: number; opp_drs: number; opp_abbr: string; delta: number };
+  const mismatches: MismatchEntry[] = [];
+  const OIQ_FLOOR = 60; // min OIQ to be considered a mismatch threat
+  const DRS_CEILING = 52; // max opponent DRS to qualify as exploitable
+
+  for (const m of keyMatchups.home_matchups) {
+    const oiq = m.rda_score;
+    const oppDrs = awayDRS;
+    if (oiq !== null && oiq >= OIQ_FLOOR && oppDrs !== null && oppDrs <= DRS_CEILING) {
+      mismatches.push({ player_id: m.player_id, player_name: m.player_name, position: m.position, oiq, opp_drs: oppDrs, opp_abbr: g.away_abbr, delta: oiq - oppDrs });
+    }
+  }
+  for (const m of keyMatchups.away_matchups) {
+    const oiq = m.rda_score;
+    const oppDrs = homeDRS;
+    if (oiq !== null && oiq >= OIQ_FLOOR && oppDrs !== null && oppDrs <= DRS_CEILING) {
+      mismatches.push({ player_id: m.player_id, player_name: m.player_name, position: m.position, oiq, opp_drs: oppDrs, opp_abbr: g.home_abbr, delta: oiq - oppDrs });
+    }
+  }
+  // Sort by delta descending — biggest mismatches first
+  mismatches.sort((a, b) => b.delta - a.delta);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Back nav */}
@@ -448,6 +473,38 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
           </GlassCard>
         )}
       </div>
+
+      {/* Mismatch Detector */}
+      {mismatches.length > 0 && (
+        <GlassCard>
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="h-3.5 w-3.5 text-amber-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Mismatch Intel</h2>
+            <span className="text-[9px] text-text-muted/40 ml-auto">High-OIQ players vs weak opponent defense</span>
+          </div>
+          <div className="space-y-2">
+            {mismatches.slice(0, 4).map((mm) => (
+              <div key={mm.player_id} className="flex items-center gap-3 p-2.5 rounded-lg bg-amber-500/[0.04] border border-amber-500/10">
+                <div className="flex-1 min-w-0">
+                  <a href={`/players/${mm.player_id}`} className="hover:text-amber-400 transition-colors">
+                    <span className="text-[13px] font-semibold text-text-primary">{mm.player_name}</span>
+                    {mm.position && <span className="text-[10px] text-text-muted/50 ml-1.5">{mm.position}</span>}
+                  </a>
+                  <p className="text-[10px] text-text-muted/50 mt-0.5">
+                    OIQ <span className="font-stat font-bold text-amber-400">{mm.oiq.toFixed(0)}</span>
+                    <span className="mx-1.5 text-text-muted/20">vs</span>
+                    {mm.opp_abbr} defense <span className="font-stat font-bold text-rose-400">DRS {mm.opp_drs.toFixed(0)}</span>
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="font-stat text-lg font-bold text-amber-400">+{mm.delta.toFixed(0)}</span>
+                  <p className="text-[9px] text-text-muted/40">edge</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
 
       {/* Key Player Matchups — H2H vs opponent */}
       {(keyMatchups.home_matchups.length > 0 || keyMatchups.away_matchups.length > 0) && (
