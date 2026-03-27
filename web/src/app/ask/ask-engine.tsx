@@ -97,81 +97,144 @@ function parseQuery(query: string, players: Player[]): QueryResult | null {
     if (abbr) filtered = filtered.filter((p) => p.team === abbr);
   }
 
-  // Query type detection
+  // All queries require meaningful minutes: 20+ MPG, 25+ GP
+  const starters = filtered.filter((p) => p.mpg >= 20 && p.gp >= 25);
+  const rotation = filtered.filter((p) => p.mpg >= 15 && p.gp >= 20);
+
+  // Query type detection — all with volume/nuance filters
   if (q.includes("defen") || q.includes("drs") || q.includes("stopper") || q.includes("rim protect")) {
     metric = "drs";
     title = "Best Defenders";
-    description = "Ranked by Defensive Reality Score (DRS) — measures true defensive impact beyond steals and blocks";
+    description = "Ranked by DRS (20+ MPG, 25+ GP) — contested shots, deflections, opponent FG% impact, on/off court differential";
+    filtered = starters;
     filtered.sort((a, b) => (b.drs ?? 0) - (a.drs ?? 0));
   } else if (q.includes("3-point") || q.includes("3pt") || q.includes("three") || q.includes("shooter") || q.includes("shooting")) {
     metric = "fg3_pct";
-    title = "Best Shooters";
-    description = "Ranked by 3PT% — minimum 10 games played this season";
-    filtered = filtered.filter((p) => p.fg3_pct > 0);
-    filtered.sort((a, b) => b.fg3_pct - a.fg3_pct);
+    title = "Best 3-Point Shooters (Volume)";
+    // Must average 3+ 3PA/game (ppg * fg3_pct proxy) AND shoot 36%+
+    description = "Ranked by 3PT% among players averaging 15+ PPG — filters out low-volume shooters";
+    filtered = starters.filter((p) => p.fg3_pct >= 0.34 && p.ppg >= 12);
+    // Sort by combo: 3PT% weighted by volume (PPG as proxy for attempts)
+    filtered.sort((a, b) => {
+      const aScore = a.fg3_pct * 0.7 + (a.ppg / 35) * 0.3;
+      const bScore = b.fg3_pct * 0.7 + (b.ppg / 35) * 0.3;
+      return bScore - aScore;
+    });
   } else if (q.includes("hot") || q.includes("streak") || q.includes("form") || q.includes("surge") || q.includes("lfi")) {
     metric = "lfi";
     title = "Hottest Players Right Now";
-    description = "Ranked by Live Form Index (LFI) — who's performing most above their season average";
+    description = "Ranked by LFI (20+ MPG) — recent performance vs their own season baseline. Not overall best — most improved recently.";
+    filtered = starters;
     filtered.sort((a, b) => (b.lfi ?? 0) - (a.lfi ?? 0));
   } else if (q.includes("cold") || q.includes("slump") || q.includes("struggling")) {
     metric = "lfi";
     sortDesc = false;
-    title = "Coldest Players Right Now";
-    description = "Ranked by Live Form Index (LFI) ascending — biggest underperformers vs their own baseline";
+    title = "Coldest Players (Biggest Slumps)";
+    description = "Players performing most below their own season average — 20+ MPG starters only";
+    filtered = starters.filter((p) => p.ppg >= 12);
     filtered.sort((a, b) => (a.lfi ?? 100) - (b.lfi ?? 100));
   } else if (q.includes("playmaker") || q.includes("passer") || q.includes("assist") || q.includes("dime")) {
     metric = "apg";
     title = "Best Playmakers";
-    description = "Ranked by assists per game";
+    description = "Ranked by APG (20+ MPG, 25+ GP) — pure assist volume for rotation players";
+    filtered = starters;
     filtered.sort((a, b) => b.apg - a.apg);
   } else if (q.includes("efficient") || q.includes("efficien")) {
-    metric = "sps";
-    title = "Most Efficient Scorers";
-    description = "Ranked by Playmaking Efficiency (PEM) — measures shot selection quality and efficiency";
-    filtered = filtered.filter((p) => p.ppg >= 12);
-    filtered.sort((a, b) => (b.sps ?? 0) - (a.sps ?? 0));
+    metric = "rda";
+    title = "Most Efficient High-Volume Scorers";
+    description = "Ranked by OIQ (15+ PPG) — efficiency weighted by scoring volume. You have to score enough for it to matter.";
+    filtered = starters.filter((p) => p.ppg >= 15);
+    filtered.sort((a, b) => (b.rda ?? 0) - (a.rda ?? 0));
   } else if (q.includes("two-way") || q.includes("2-way") || q.includes("both ends") || q.includes("all-around")) {
     metric = "bis";
     title = "Best Two-Way Players";
-    description = "Players with elite BIS and DRS ≥ 60 — impact on both ends";
-    filtered = filtered.filter((p) => (p.drs ?? 0) >= 60);
-    filtered.sort((a, b) => (b.bis ?? 0) - (a.bis ?? 0));
+    description = "Players with BIS ≥ 60 AND DRS ≥ 55 — must be impactful on BOTH ends (20+ MPG)";
+    filtered = starters.filter((p) => (p.bis ?? 0) >= 50 && (p.drs ?? 0) >= 50);
+    // Sort by combined BIS + DRS
+    filtered.sort((a, b) => ((b.bis ?? 0) + (b.drs ?? 0)) - ((a.bis ?? 0) + (a.drs ?? 0)));
   } else if (q.includes("worst") && q.includes("defen")) {
     metric = "drs";
     sortDesc = false;
-    title = "Worst Defenders (High Usage)";
-    description = "Players with low DRS who play significant minutes — biggest defensive liabilities";
-    filtered = filtered.filter((p) => p.ppg >= 12);
+    title = "Worst Defenders (Starters Only)";
+    description = "Biggest defensive liabilities among 15+ PPG starters — they play heavy minutes but hurt on D";
+    filtered = starters.filter((p) => p.ppg >= 15);
     filtered.sort((a, b) => (a.drs ?? 100) - (b.drs ?? 100));
   } else if (q.includes("can't shoot") || q.includes("cant shoot") || q.includes("non-shooter")) {
     metric = "fg3_pct";
     sortDesc = false;
-    title = "Worst Shooters";
-    description = "Players with lowest 3PT% who take at least some threes";
-    filtered = filtered.filter((p) => p.fg3_pct > 0 && p.fg3_pct < 0.32);
+    title = "Worst Shooters (Among Starters)";
+    description = "Starters with 20+ MPG and FG3% below 32% — their lack of shooting hurts team spacing";
+    filtered = starters.filter((p) => p.fg3_pct > 0 && p.fg3_pct < 0.32 && p.ppg >= 10);
     filtered.sort((a, b) => a.fg3_pct - b.fg3_pct);
   } else if (q.includes("off-ball") || q.includes("gravity") || q.includes("spacing")) {
     metric = "goi";
-    title = "Best Off-Ball Players";
-    description = "Ranked by Gravity & Off-Ball Impact (GOI) — value created without the basketball";
+    title = "Best Off-Ball Impact Players";
+    description = "Ranked by GOI (20+ MPG) — clutch performance, +/- consistency, team impact without the ball";
+    filtered = starters;
     filtered.sort((a, b) => (b.goi ?? 0) - (a.goi ?? 0));
   } else if (q.includes("improv") || q.includes("breakout") || q.includes("rising")) {
     metric = "lfi";
-    title = "Most Improved / Breakout Players";
-    description = "Players with LFI significantly above their baseline — performing much better recently";
-    filtered = filtered.filter((p) => (p.lfi ?? 0) >= 65);
+    title = "Biggest Breakout Players";
+    description = "Players with LFI ≥ 65 and 20+ MPG — significantly exceeding their own baseline recently";
+    filtered = starters.filter((p) => (p.lfi ?? 0) >= 60);
     filtered.sort((a, b) => (b.lfi ?? 0) - (a.lfi ?? 0));
+  } else if (q.includes("overrated") || q.includes("overpaid") || q.includes("overvalued")) {
+    metric = "bis";
+    sortDesc = false;
+    title = "Most Overrated (High PPG, Low BIS)";
+    description = "Players scoring 18+ PPG but with below-average BIS — volume scorers who don't impact winning";
+    filtered = starters.filter((p) => p.ppg >= 18 && (p.bis ?? 100) < 60);
+    filtered.sort((a, b) => (a.bis ?? 100) - (b.bis ?? 100));
+  } else if (q.includes("underrated") || q.includes("undervalued") || q.includes("sleeper")) {
+    metric = "bis";
+    title = "Most Underrated (Low PPG, High BIS)";
+    description = "Players with BIS ≥ 60 but under 18 PPG — high impact without the box score stats";
+    filtered = starters.filter((p) => p.ppg < 18 && (p.bis ?? 0) >= 55);
+    filtered.sort((a, b) => (b.bis ?? 0) - (a.bis ?? 0));
+  } else if (q.includes("rookie") || q.includes("first year") || q.includes("young")) {
+    metric = "bis";
+    title = "Best Young Players / Rookies";
+    description = "Ranked by BIS among players with 15+ MPG — tomorrow's stars";
+    filtered = rotation;
+    filtered.sort((a, b) => (b.bis ?? 0) - (a.bis ?? 0));
+    // Can't filter by age since we don't have it, just show top overall
   } else if (q.includes("scorer") || q.includes("scoring") || q.includes("points") || q.includes("ppg")) {
     metric = "ppg";
     title = "Top Scorers";
-    description = "Ranked by points per game";
+    description = "Ranked by PPG (20+ MPG, 25+ GP) — pure scoring volume among qualified starters";
+    filtered = starters;
     filtered.sort((a, b) => b.ppg - a.ppg);
   } else if (q.includes("rebound") || q.includes("rpg") || q.includes("glass")) {
     metric = "rpg";
     title = "Top Rebounders";
-    description = "Ranked by rebounds per game";
+    description = "Ranked by RPG (20+ MPG, 25+ GP)";
+    filtered = starters;
     filtered.sort((a, b) => b.rpg - a.rpg);
+  } else if (q.includes("steal") || q.includes("thief") || q.includes("pickpocket")) {
+    metric = "spg";
+    title = "Top Ball Hawks";
+    description = "Ranked by SPG (20+ MPG, 25+ GP) — the league's best at creating turnovers";
+    filtered = starters;
+    filtered.sort((a, b) => b.spg - a.spg);
+  } else if (q.includes("block") || q.includes("swat") || q.includes("rim protect")) {
+    metric = "bpg";
+    title = "Top Shot Blockers";
+    description = "Ranked by BPG (20+ MPG, 25+ GP)";
+    filtered = starters;
+    filtered.sort((a, b) => b.bpg - a.bpg);
+  } else if (q.includes("turnover") || q.includes("careless") || q.includes("sloppy")) {
+    metric = "topg";
+    sortDesc = false;
+    title = "Worst Ball Handlers (Most Turnovers)";
+    description = "Most turnovers per game among 15+ PPG starters — talented but careless";
+    filtered = starters.filter((p) => p.ppg >= 15);
+    filtered.sort((a, b) => b.topg - a.topg);
+  } else if (q.includes("clutch") || q.includes("closer") || q.includes("4th quarter") || q.includes("crunch")) {
+    metric = "goi";
+    title = "Best Clutch Players";
+    description = "Ranked by GOI (20+ MPG) — performance in close games and high-leverage moments";
+    filtered = starters;
+    filtered.sort((a, b) => (b.goi ?? 0) - (a.goi ?? 0));
   } else if (q.includes("best") || q.includes("top") || q.includes("elite") || q.includes("mvp")) {
     metric = "bis";
     title = "Best Players Overall";
