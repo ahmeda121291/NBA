@@ -4,9 +4,9 @@ import { useState, useRef, useCallback, useMemo } from "react";
 import { toPng } from "html-to-image";
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, ReferenceLine, Label
+  BarChart, Bar, Cell, ReferenceLine, Label, LabelList
 } from "recharts";
-import { Download, Grid3X3, Trophy, BarChart3, TrendingUp, Zap, Users, Search, X, Twitter, Instagram, Monitor } from "lucide-react";
+import { Download, Grid3X3, Trophy, BarChart3, TrendingUp, Zap, Users, Search, X, Twitter, Instagram, Monitor, ChevronDown, ChevronUp } from "lucide-react";
 
 // ============================================================
 // Types
@@ -116,6 +116,7 @@ export function StudioBuilder({ players, teams }: Props) {
   const [handle, setHandle] = useState("");
   const [topN, setTopN] = useState(10);
   const [selectedPlayerCard, setSelectedPlayerCard] = useState<PlayerData | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Auto-title based on template
@@ -331,12 +332,30 @@ export function StudioBuilder({ players, teams }: Props) {
           )}
         </div>
 
-        {/* Player Picker */}
+        {/* Player Picker — Collapsible */}
         {(chartType === "quadrant" || chartType === "bar-compare" || chartType === "stat-card") && (
           <div className="glass-card p-4 space-y-3">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">
-              {chartType === "stat-card" ? "Select Player" : `Players (${selectedPlayers.length})`}
-            </h3>
+            <button
+              onClick={() => setPickerOpen(!pickerOpen)}
+              className="w-full flex items-center justify-between"
+            >
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">
+                {chartType === "stat-card" ? "Select Player" : `Players (${selectedPlayers.length})`}
+              </h3>
+              {pickerOpen
+                ? <ChevronUp className="h-3.5 w-3.5 text-text-muted/40" />
+                : <ChevronDown className="h-3.5 w-3.5 text-text-muted/40" />
+              }
+            </button>
+            {!pickerOpen && selectedPlayers.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {selectedPlayers.slice(0, 8).map(p => (
+                  <span key={p.id} className="text-[9px] bg-indigo-500/10 text-indigo-400/70 rounded-full px-2 py-0.5">{p.name.split(" ").pop()}</span>
+                ))}
+                {selectedPlayers.length > 8 && <span className="text-[9px] text-text-muted/40">+{selectedPlayers.length - 8} more</span>}
+              </div>
+            )}
+            {!pickerOpen ? null : (<div className="space-y-3">
 
             {/* Smart Filters */}
             <div className="space-y-2">
@@ -558,6 +577,7 @@ export function StudioBuilder({ players, teams }: Props) {
                 </div>
               </>
             )}
+            </div>)}
           </div>
         )}
 
@@ -690,6 +710,12 @@ function QuadrantChart({ players, xKey, yKey }: { players: PlayerData[]; xKey: s
           {data.map((d, i) => (
             <Cell key={i} fill={tierColor(d.bis)} opacity={0.85} />
           ))}
+          <LabelList
+            dataKey="name"
+            position="top"
+            offset={8}
+            style={{ fill: "rgba(255,255,255,0.7)", fontSize: 9, fontWeight: 600 }}
+          />
         </Scatter>
       </ScatterChart>
     </ResponsiveContainer>
