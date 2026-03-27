@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { tierClass, tierLabel, tierBorder, getStreakBadge } from "@/lib/formatting";
 import { CURRENT_SEASON } from "@/lib/constants";
 import { PerformanceTrendChart } from "@/components/ui/performance-trend-chart";
+import { FavoritePlayerButton } from "@/components/shared/favorite-button";
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -77,6 +78,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight gradient-text">{p.full_name}</h1>
+              <FavoritePlayerButton playerId={Number(id)} />
               {(() => { const sb = getStreakBadge(p.lfi_streak_label); return sb ? <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${sb.cls}`}>{sb.text}</span> : null; })()}
             </div>
             <div className="flex items-center gap-2 mt-1.5">

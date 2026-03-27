@@ -373,6 +373,16 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
 
+            {/* Projected Spread */}
+            {proj.margin != null && Number(proj.margin) > 0 && (
+              <div className="mb-4 p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/15">
+                <p className="text-[9px] text-text-muted/50 uppercase tracking-wider mb-1">Projected Spread</p>
+                <p className="font-stat text-lg font-bold text-indigo-400">
+                  {favoredAbbr} -{Number(proj.margin).toFixed(1)}
+                </p>
+              </div>
+            )}
+
             {keyReasons && keyReasons.length > 0 && (
               <div className="space-y-1.5">
                 {keyReasons.map((reason: string, i: number) => (

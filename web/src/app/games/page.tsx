@@ -216,6 +216,12 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                       <Zap className="h-2.5 w-2.5" /> Upset Risk
                     </span>
                   )}
+                  {/* CourtVision Spread badge */}
+                  {hasProjection && margin != null && margin > 0 && (
+                    <span className="text-[10px] font-stat font-bold text-indigo-400/70 border border-indigo-500/20 bg-indigo-500/5 rounded px-1.5 py-0.5">
+                      {favoredAbbr} -{margin.toFixed(1)}
+                    </span>
+                  )}
                 </div>
                 <span className="font-stat text-text-muted/60">
                   {game.home_wins}-{game.home_losses} vs {game.away_wins}-{game.away_losses}

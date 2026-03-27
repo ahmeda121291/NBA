@@ -41,12 +41,12 @@ export const METRIC_LABELS: Record<string, { name: string; description: string; 
   mai: {
     name: "Matchup Advantage Index",
     short: "MAI",
-    description: "Estimates game-specific edge based on likely defender, scheme, pace, and fatigue.",
+    description: "Game-specific edge based on likely defender, scheme fit, pace, and fatigue. Higher means a more favorable matchup tonight. Useful for projecting over/underperformance relative to season averages.",
   },
   gip: {
     name: "Game Impact Projection",
     short: "GIP",
-    description: "Projects expected player impact and stat line for tonight's game.",
+    description: "Projected stat line and impact for tonight's game, combining player baseline, matchup context, and recent form. Higher means a bigger expected contribution.",
   },
 
   // ---- CourtVision Team Metrics ----

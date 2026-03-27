@@ -6,6 +6,7 @@ import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import { getTeamWithMetrics, getTeamRoster } from "@/lib/db/queries";
 import { notFound } from "next/navigation";
 import { tierClass, tierBorder } from "@/lib/formatting";
+import { FavoriteTeamButton } from "@/components/shared/favorite-button";
 
 const LEAGUE_AVG_ORTG = 112;
 
@@ -50,7 +51,10 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
             <Image src={getTeamLogoByAbbr(t.abbreviation)} alt={t.name} fill className="object-contain drop-shadow-xl" unoptimized />
           </div>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold tracking-tight gradient-text">{t.city} {t.nickname}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight gradient-text">{t.city} {t.nickname}</h1>
+              <FavoriteTeamButton teamId={Number(id)} />
+            </div>
             <div className="flex items-center gap-3 mt-1">
               <span className="font-stat text-sm text-text-secondary">{wins}-{losses}</span>
               <span className="text-text-muted/20">|</span>
