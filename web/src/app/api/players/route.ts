@@ -1,19 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const page = parseInt(searchParams.get("page") || "1", 10);
-  const perPage = parseInt(searchParams.get("per_page") || "50", 10);
-  const position = searchParams.get("position");
-  const search = searchParams.get("q");
+  const q = request.nextUrl.searchParams.get("q") ?? "";
+  const pos = request.nextUrl.searchParams.get("pos") ?? "";
 
-  // TODO: Replace with actual DB query
-  // const players = search
-  //   ? await searchPlayers(search, perPage)
-  //   : await getAllPlayers(perPage, (page - 1) * perPage);
+  const rows = await db.execute(sql`
+    SELECT DISTINCT ON (p.id)
+      p.id,
+      p.full_name,
+      p.position,
+      p.external_id,
+      t.abbreviation AS team_abbr,
+      ROUND(pms.bis_score::numeric, 1) AS bis_score
+    FROM players p
+    JOIN player_season_stats pss ON p.id = pss.player_id
+    JOIN teams t ON pss.team_id = t.id
+    LEFT JOIN player_metric_snapshots pms ON pms.player_id = p.id
+    WHERE pss.gp >= 5
+      AND (${q} = '' OR LOWER(p.full_name) LIKE ${'%' + q.toLowerCase() + '%'})
+      AND (${pos} = '' OR p.position ILIKE ${'%' + pos + '%'})
+    ORDER BY p.id, pms.bis_score DESC NULLS LAST
+  `);
 
-  return NextResponse.json({
-    data: [],
-    meta: { page, perPage, total: 0, computedAt: new Date().toISOString() },
+  const sorted = [...(rows as any[])].sort((a, b) => {
+    const ba = a.bis_score != null ? Number(a.bis_score) : -1;
+    const bb = b.bis_score != null ? Number(b.bis_score) : -1;
+    return bb - ba;
   });
+
+  return NextResponse.json({ players: sorted });
 }
