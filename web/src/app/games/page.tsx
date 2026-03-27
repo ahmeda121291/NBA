@@ -24,6 +24,44 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const activeDate = requestedDate || latestDate || "";
   let games = activeDate ? ((await getGamesByDateWithProjections(activeDate)) as any[]) : [];
 
+  // For today's games, overlay live scores from NBA CDN so they match the ticker
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (activeDate === todayStr && games.length > 0) {
+    try {
+      const liveResp = await fetch(
+        "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
+        {
+          headers: { "User-Agent": "Mozilla/5.0", Referer: "https://www.nba.com/" },
+          next: { revalidate: 0 },
+          cache: "no-store",
+        }
+      );
+      if (liveResp.ok) {
+        const liveData = await liveResp.json();
+        const liveGames = liveData?.scoreboard?.games || [];
+        // Build map of gameId -> live scores
+        const liveMap = new Map<string, { homeScore: number; awayScore: number; status: string }>();
+        for (const lg of liveGames) {
+          const status = Number(lg.gameStatus) === 3 ? "final" : Number(lg.gameStatus) === 2 ? "live" : "scheduled";
+          liveMap.set(lg.gameId, {
+            homeScore: lg.homeTeam?.score ?? 0,
+            awayScore: lg.awayTeam?.score ?? 0,
+            status,
+          });
+        }
+        // Overlay onto DB games
+        for (const game of games) {
+          const live = liveMap.get(game.external_id);
+          if (live && (live.status === "final" || live.status === "live")) {
+            game.home_score = live.homeScore;
+            game.away_score = live.awayScore;
+            game.status = live.status;
+          }
+        }
+      }
+    } catch {}
+  }
+
   // Compute live projections for ALL non-final games (always fresh)
   const nonFinalIds = games
     .filter((g: any) => g.status !== "final")
