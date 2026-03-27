@@ -222,14 +222,14 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                 </span>
               </div>
 
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-6">
+              <div className="grid grid-cols-[1fr_auto_1fr] sm:grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-6">
                 {/* Away */}
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 transition-transform group-hover:scale-105">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="relative h-10 w-10 sm:h-14 sm:w-14 shrink-0 transition-transform group-hover:scale-105">
                     <Image src={getTeamLogoByAbbr(game.away_abbr)} alt={game.away_name} fill className="object-contain drop-shadow-lg" unoptimized />
                   </div>
-                  <div>
-                    <p className={`text-base sm:text-lg font-bold tracking-tight ${awayWon ? "text-emerald-400" : ""}`}>{game.away_name}</p>
+                  <div className="min-w-0">
+                    <p className={`text-sm sm:text-lg font-bold tracking-tight truncate ${awayWon ? "text-emerald-400" : ""}`}>{game.away_name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="font-stat text-xs text-text-muted">{game.away_abbr}</span>
                       {awayTSC != null && <span className={`font-stat text-[10px] ${tierClass(awayTSC)}`}>TSC {awayTSC.toFixed(0)}</span>}
@@ -238,7 +238,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                 </div>
 
                 {/* Score / Projection center */}
-                <div className="text-center px-2 sm:px-6 min-w-[120px]">
+                <div className="text-center px-1 sm:px-6 min-w-[80px] sm:min-w-[120px]">
                   {isFinal ? (
                     <>
                       <p className="font-stat text-2xl sm:text-3xl font-bold text-text-primary">
@@ -274,15 +274,15 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
                 </div>
 
                 {/* Home */}
-                <div className="flex items-center justify-end gap-3 sm:gap-4">
-                  <div className="text-right">
-                    <p className={`text-base sm:text-lg font-bold tracking-tight ${homeWon ? "text-emerald-400" : ""}`}>{game.home_name}</p>
+                <div className="flex items-center justify-end gap-2 sm:gap-4">
+                  <div className="text-right min-w-0">
+                    <p className={`text-sm sm:text-lg font-bold tracking-tight truncate ${homeWon ? "text-emerald-400" : ""}`}>{game.home_name}</p>
                     <div className="flex items-center justify-end gap-2 mt-0.5">
                       {homeTSC != null && <span className={`font-stat text-[10px] ${tierClass(homeTSC)}`}>TSC {homeTSC.toFixed(0)}</span>}
                       <span className="font-stat text-xs text-text-muted">{game.home_abbr}</span>
                     </div>
                   </div>
-                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 transition-transform group-hover:scale-105">
+                  <div className="relative h-10 w-10 sm:h-14 sm:w-14 shrink-0 transition-transform group-hover:scale-105">
                     <Image src={getTeamLogoByAbbr(game.home_abbr)} alt={game.home_name} fill className="object-contain drop-shadow-lg" unoptimized />
                   </div>
                 </div>

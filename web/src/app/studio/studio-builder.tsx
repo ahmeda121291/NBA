@@ -175,7 +175,7 @@ export function StudioBuilder({ players, teams }: Props) {
       if (teamFilter !== "All" && p.team !== teamFilter) return false;
       if (excludeInjured && (p.injuryStatus === "Out" || p.injuryStatus === "out")) return false;
       if (minGP > 0 && p.gp < minGP) return false;
-      if (expFilter === "rookie" && p.draftYear !== 2025) return false;
+      if (expFilter === "rookie" && p.draftYear !== SEASON_YEAR - 1) return false;
       if (expFilter === "sophomore" && p.draftYear !== 2024) return false;
       if (expFilter === "young" && (p.draftYear < 2022 || p.draftYear === 0)) return false;
       if (expFilter === "veteran" && (p.draftYear >= 2022 || p.draftYear === 0)) return false;
@@ -421,7 +421,7 @@ export function StudioBuilder({ players, teams }: Props) {
                     className="w-full bg-[#141925] border border-white/[0.1] rounded px-2 py-1 text-[11px] text-text-primary outline-none [&>option]:bg-[#141925] [&>option]:text-white"
                   >
                     <option value="all">All Players</option>
-                    <option value="rookie">Rookies (2025)</option>
+                    <option value="rookie">Rookies ({SEASON_YEAR - 1})</option>
                     <option value="sophomore">Sophomores (2024)</option>
                     <option value="young">Young (draft 2022+)</option>
                     <option value="veteran">Veterans (pre-2022)</option>
@@ -512,7 +512,7 @@ export function StudioBuilder({ players, teams }: Props) {
                       { label: "Top 10 Scorers", fn: () => [...players].sort((a,b) => b.ppg - a.ppg).slice(0,10) },
                       { label: "Top 10 Defenders", fn: () => [...players].sort((a,b) => (b.drs??0) - (a.drs??0)).slice(0,10) },
                       { label: "Top 10 Playmakers", fn: () => [...players].sort((a,b) => b.apg - a.apg).slice(0,10) },
-                      { label: "Rookies Only", fn: () => players.filter(p => p.draftYear === 2025 && p.gp >= 20).sort((a,b) => (b.bis??0) - (a.bis??0)).slice(0,15) },
+                      { label: "Rookies Only", fn: () => players.filter(p => p.draftYear === SEASON_YEAR - 1 && p.gp >= 20).sort((a,b) => (b.bis??0) - (a.bis??0)).slice(0,15) },
                       { label: "All Filtered", fn: () => getFilteredPlayers().slice(0, 50) },
                     ].map(preset => (
                       <button
