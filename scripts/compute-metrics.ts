@@ -305,6 +305,11 @@ async function main() {
     let drs: number;
     const posDefAvg = posAvgDef[posGroup] || posAvgDef.G;
 
+    // Declare DRS component variables at outer scope so they're accessible for drsComponents
+    let oppFgDiff = 0, deterrenceScore = 50, onOffScore = 50, onOffImpact = 0;
+    let dFga = 0, versatilityBonus = 0, contestScore = 0, deflScore = 0;
+    let stlScore = 0, blkScore = 0, loadScore = 0, minutesScore = 0, hustleScore = 0;
+
     if (hasDefData) {
       // ============================================================
       // DRS v7: RAW STATS + MINUTES/GP + LOAD + DETERRENCE + ON/OFF
@@ -314,41 +319,41 @@ async function main() {
       // D_FGA = "are you guarding the best players?" signal.
 
       // 1. DETERRENCE (18%) — opponent FG% impact
-      const oppFgDiff = parseFloat(ps.opp_fg_pct_diff || "0");
+      oppFgDiff = parseFloat(ps.opp_fg_pct_diff || "0");
       const hasDeterrenceData = ps.opp_fg_pct_diff != null && ps.opp_fg_pct_diff !== "";
-      const deterrenceScore = hasDeterrenceData
+      deterrenceScore = hasDeterrenceData
         ? clamp(50 + (oppFgDiff * -100) * 5, 0, 100) : 50;
 
       // 2. ON/OFF IMPACT (12%) — team defense without you
       const teamDrtgVal = teamDrtgMap[Number(ps.team_id)] || 112;
-      const onOffImpact = teamDrtgVal - defRating;
-      const onOffScore = clamp(50 + onOffImpact * 7, 0, 100);
+      onOffImpact = teamDrtgVal - defRating;
+      onOffScore = clamp(50 + onOffImpact * 7, 0, 100);
 
       // 3-6. RAW COUNTING STATS (contests 15%, defl 12%, stl 10%, blk 7%)
-      const contestScore = clamp(contestedShots * 7.5, 0, 100);
-      const deflScore = clamp(deflections * 22, 0, 100);
-      const stlScore = clamp(spg * 40, 0, 100);
-      const blkScore = clamp(bpg * 28, 0, 100);
+      contestScore = clamp(contestedShots * 7.5, 0, 100);
+      deflScore = clamp(deflections * 22, 0, 100);
+      stlScore = clamp(spg * 40, 0, 100);
+      blkScore = clamp(bpg * 28, 0, 100);
 
       // 7. DEFENSIVE LOAD (8%) — how many FGA opponents take against you
-      const dFga = parseFloat(ps.d_fga || "0");
-      const loadScore = clamp(dFga * 5.5, 0, 100);
+      dFga = parseFloat(ps.d_fga || "0");
+      loadScore = clamp(dFga * 5.5, 0, 100);
 
       // 8. MINUTES + GP BONUS (8%) — sustained heavy-minute defenders
       const minutesRaw = clamp((mpg - 15) * 4, 0, 100);
       // GP penalty: missing games HURTS. 70 GP = 1.0, 50 GP = 0.71, 35 GP = 0.50, 25 GP = 0.36
       // Formula: (gp/70)^1.5 — exponential penalty for missing games
       const gpFactor = clamp(Math.pow(gp / 70, 1.5), 0.25, 1.0);
-      const minutesScore = minutesRaw * gpFactor;
+      minutesScore = minutesRaw * gpFactor;
 
       // 9. VERSATILITY (5%) — perimeter + interior actions both present
       const perimActions = spg + deflections;
       const interiorActions = bpg + contestedShots * 0.15;
-      const versatilityBonus = (perimActions > 2.5 && interiorActions > 1.5)
+      versatilityBonus = (perimActions > 2.5 && interiorActions > 1.5)
         ? Math.min((perimActions + interiorActions) * 3, 15) : 0;
 
       // 10. HUSTLE (5%) — loose balls + charges
-      const hustleScore = clamp((looseBalls + chargesDrawn) * 30, 0, 100);
+      hustleScore = clamp((looseBalls + chargesDrawn) * 30, 0, 100);
 
       drs = clamp(
         deterrenceScore * 0.18 + contestScore * 0.15 + onOffScore * 0.12 +
