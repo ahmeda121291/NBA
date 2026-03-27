@@ -16,8 +16,6 @@ import {
   CreditCard,
   Crown,
   Palette,
-  MessageCircle,
-  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CURRENT_SEASON } from "@/lib/constants";
@@ -31,8 +29,7 @@ const navItems = [
   { href: "/compare", label: "Compare", icon: GitCompare, shortcut: "6" },
   { href: "/pulse", label: "Daily Brief", icon: Zap, shortcut: "7" },
   { href: "/studio", label: "Studio", icon: Palette, shortcut: "8" },
-  { href: "/ask", label: "Search", icon: Search, shortcut: "9" },
-  { href: "/methodology", label: "Methodology", icon: BookOpen, shortcut: "0" },
+  { href: "/methodology", label: "Methodology", icon: BookOpen, shortcut: "9" },
   { href: "/pricing", label: "Pricing", icon: Crown, shortcut: "" },
 ];
 

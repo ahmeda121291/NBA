@@ -66,7 +66,11 @@
       "Bash(npx tsx -e \":*)",
       "Bash(curl -s \"https://nba-production-59c0.up.railway.app/teams\")",
       "Bash(node -e \"require\\(''dotenv''\\).config\\({path:''web/.env.local''}\\); const p = require\\(''postgres''\\); const sql = p\\(process.env.DATABASE_URL, {max:1}\\); sql\\\\`SELECT 1 as ok\\\\`.then\\(r => { console.log\\(''DB OK:'', r[0].ok\\); sql.end\\(\\); }\\).catch\\(e => console.log\\(''DB fail:'', e.message\\)\\)\")",
-      "Bash(node -e \"console.log\\(''Today:'', new Date\\(\\).toISOString\\(\\).slice\\(0,10\\)\\)\")"
+      "Bash(node -e \"console.log\\(''Today:'', new Date\\(\\).toISOString\\(\\).slice\\(0,10\\)\\)\")",
+      "Bash(find /Users/Aawad/NBA/.claude/worktrees/thirsty-raman -maxdepth 2 -type f -name README* -o -name ARCHITECTURE* -o -name DESIGN*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(npx -p typescript tsc --noEmit --pretty)",
+      "Bash(find C:UsersAawadNBA.claudeworktreesthirsty-ramanwebsrc -type f -path *api* -name *search* -o -path *api* -name *ask*)"
     ]
   }
 }
