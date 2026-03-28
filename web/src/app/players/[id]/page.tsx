@@ -2,6 +2,7 @@ import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ScoreOrb } from "@/components/ui/score-orb";
 import { RadarChart } from "@/components/ui/radar-chart";
+import { ShareImageWrapper } from "@/components/shared/share-image-button";
 import { ArrowLeft, TrendingUp, Flame, Shield, Activity, Zap, Target, BarChart3, FileText, Swords, DollarSign } from "lucide-react";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import { getPlayerWithMetrics, getPlayerGameLogs } from "@/lib/db/queries";
@@ -76,6 +77,10 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
         <a href="/players" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-indigo-400 transition-colors mb-4">
           <ArrowLeft className="h-3 w-3" /> Back to Players
         </a>
+      </div>
+
+      <ShareImageWrapper filename={`courtvision-${p.full_name?.replace(/\s+/g, "-").toLowerCase()}`} label="Save Player Card">
+      <div>
 
         <div className="flex items-start gap-5">
           <div className="relative h-28 w-28 shrink-0 overflow-hidden bg-white/[0.04] border border-white/[0.06] rounded-xl"
@@ -195,6 +200,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
       )}
+      </ShareImageWrapper>
 
       {/* Season Stats */}
       <GlassCard>
