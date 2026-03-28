@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
       p.position,
       p.external_id,
       t.abbreviation AS team_abbr,
-      ROUND(pms.bis_score::numeric, 1) AS bis_score
+      ROUND(pms.bis_score::numeric, 1) AS bis_score,
+      ROUND(pms.lfi_score::numeric, 1) AS lfi_score
     FROM players p
     JOIN player_season_stats pss ON p.id = pss.player_id
     JOIN teams t ON pss.team_id = t.id
