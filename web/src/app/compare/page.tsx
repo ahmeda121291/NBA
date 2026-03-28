@@ -886,14 +886,30 @@ export default function ComparePage() {
     }).filter((x): x is NonNullable<typeof x> => x !== null);
   }, [allPlayers]);
 
-  // Select a player (fetches full data from compare API)
+  // Select a player (fetches full data from compare API only when both slots filled)
   const selectPlayer = useCallback(async (option: PlayerOption, slot: 1 | 2) => {
-    const id = option.id;
     const otherId = slot === 1 ? player2?.id : player1?.id;
+
+    // If the other slot is empty, just fetch this player's full data solo
+    if (!otherId) {
+      setLoading(true);
+      try {
+        // Fetch via compare API with same player to get full stat object,
+        // but only set the correct slot
+        const res  = await fetch(`/api/compare?p1=${option.id}&p2=${option.id}`);
+        const json = await res.json();
+        if (slot === 1 && json.player1) setPlayer1(json.player1);
+        if (slot === 2 && json.player2) setPlayer2(json.player2);
+      } catch { /* ignore */ }
+      finally { setLoading(false); }
+      return;
+    }
+
+    // Both slots will be filled — fetch the real comparison
     setLoading(true);
     try {
-      const p1Id = slot === 1 ? id : (otherId ?? id);
-      const p2Id = slot === 2 ? id : (otherId ?? id);
+      const p1Id = slot === 1 ? option.id : player1?.id;
+      const p2Id = slot === 2 ? option.id : player2?.id;
       const res  = await fetch(`/api/compare?p1=${p1Id}&p2=${p2Id}`);
       const json = await res.json();
       if (json.player1) setPlayer1(json.player1);
