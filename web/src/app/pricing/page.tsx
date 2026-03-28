@@ -1,5 +1,26 @@
+import type { Metadata } from "next";
 import { GlassCard } from "@/components/ui/glass-card";
 import { auth } from "@/lib/auth";
+
+export const metadata: Metadata = {
+  title: "Pricing | CourtVision AI",
+  description:
+    "Unlock advanced NBA analytics, AI projections, and player intelligence. Free and Pro plans available.",
+  openGraph: {
+    title: "Pricing | CourtVision AI",
+    description:
+      "Unlock advanced NBA analytics, AI projections, and player intelligence. Free and Pro plans available.",
+    siteName: "CourtVision AI",
+    url: "https://courtvisionai.io/pricing",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pricing | CourtVision AI",
+    description:
+      "Unlock advanced NBA analytics, AI projections, and player intelligence. Free and Pro plans available.",
+  },
+};
 import { PLANS } from "@/lib/stripe";
 import { Check, X, Zap, Crown, Shield, HelpCircle } from "lucide-react";
 import { UpgradeButton } from "./upgrade-button";
@@ -19,8 +40,6 @@ const COMPARISON_ROWS = [
   { feature: "Studio — Shareable Charts & Visuals", free: "1 per day", pro: true },
   { feature: "Performance Trend Charts", free: false, pro: true },
   { feature: "Contract Value (VFM) Analysis", free: false, pro: true },
-  { feature: "CSV Data Export", free: false, pro: true },
-  { feature: "Smart Search (Ask CV)", free: "3 per day", pro: true },
 ];
 
 const FAQ = [
@@ -37,8 +56,8 @@ const FAQ = [
     a: "Yes — cancel anytime from your account page. You'll keep Pro access until the end of your billing period. No long-term contracts.",
   },
   {
-    q: "Do you offer a free trial?",
-    a: "The free tier gives you permanent access to basic features. Upgrade to Pro when you're ready for the full experience — there's no trial period needed because the free tier is genuinely useful.",
+    q: "How does the free plan work?",
+    a: "The free plan gives you permanent access to standings, basic stats, and game results. When you're ready for advanced metrics, AI projections, and full player intelligence, upgrade to Pro — it's instant access, cancel anytime.",
   },
 ];
 

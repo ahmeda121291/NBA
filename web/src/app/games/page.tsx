@@ -1,4 +1,25 @@
+import type { Metadata } from "next";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: "NBA Games & Projections | CourtVision AI",
+  description:
+    "Live NBA game predictions with AI-powered win probabilities, projected scores, and upset alerts.",
+  openGraph: {
+    title: "NBA Games & Projections | CourtVision AI",
+    description:
+      "Live NBA game predictions with AI-powered win probabilities, projected scores, and upset alerts.",
+    siteName: "CourtVision AI",
+    url: "https://courtvisionai.io/games",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NBA Games & Projections | CourtVision AI",
+    description:
+      "Live NBA game predictions with AI-powered win probabilities, projected scores, and upset alerts.",
+  },
+};
 import { TrendingUp, Target, AlertTriangle, Check, X, Zap, Shield } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { DatePicker } from "@/components/shared/date-picker";

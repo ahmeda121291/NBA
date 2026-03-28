@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { CURRENT_SEASON } from "@/lib/constants";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, shortcut: "1" },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "1" },
   { href: "/games", label: "Games", icon: Calendar, shortcut: "2" },
   { href: "/teams", label: "Teams", icon: Users, shortcut: "3" },
   { href: "/players", label: "Players", icon: User, shortcut: "4" },
@@ -79,7 +79,8 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href));
+            (item.href !== "/" && item.href !== "/dashboard" && pathname.startsWith(item.href)) ||
+            (item.href === "/dashboard" && pathname === "/dashboard");
 
           return (
             <Link

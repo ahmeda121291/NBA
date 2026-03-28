@@ -1,5 +1,26 @@
+import type { Metadata } from "next";
 import { METRIC_LABELS, CONFIDENCE_LABELS } from "@/lib/constants";
 import { GlassCard } from "@/components/ui/glass-card";
+
+export const metadata: Metadata = {
+  title: "Methodology | CourtVision AI",
+  description:
+    "How CourtVision's proprietary NBA metrics work — BIS, DRS, LFI, OIQ, PEM, and GOI explained.",
+  openGraph: {
+    title: "Methodology | CourtVision AI",
+    description:
+      "How CourtVision's proprietary NBA metrics work — BIS, DRS, LFI, OIQ, PEM, and GOI explained.",
+    siteName: "CourtVision AI",
+    url: "https://courtvisionai.io/methodology",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Methodology | CourtVision AI",
+    description:
+      "How CourtVision's proprietary NBA metrics work — BIS, DRS, LFI, OIQ, PEM, and GOI explained.",
+  },
+};
 import { BookOpen, Layers, Shield, Activity, Clock, AlertTriangle, BarChart3, Target } from "lucide-react";
 
 // Extended metric info with formulas, inputs, and tier descriptions

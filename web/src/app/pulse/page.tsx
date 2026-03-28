@@ -1,6 +1,27 @@
+import type { Metadata } from "next";
 import { GlassCard } from "@/components/ui/glass-card";
 import { MetricTooltip } from "@/components/shared/metric-tooltip";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: "Daily Brief | CourtVision AI",
+  description:
+    "Your daily NBA intelligence briefing — trending players, key matchups, and performance alerts.",
+  openGraph: {
+    title: "Daily Brief | CourtVision AI",
+    description:
+      "Your daily NBA intelligence briefing — trending players, key matchups, and performance alerts.",
+    siteName: "CourtVision AI",
+    url: "https://courtvisionai.io/pulse",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Daily Brief | CourtVision AI",
+    description:
+      "Your daily NBA intelligence briefing — trending players, key matchups, and performance alerts.",
+  },
+};
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import {
   getBiggestMovers,

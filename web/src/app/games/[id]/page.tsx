@@ -10,6 +10,7 @@ import { getGameKeyMatchups } from "@/lib/db/queries/matchups";
 import { computeLiveProjections, computeLivePlayerProjections } from "@/lib/projections";
 import { notFound } from "next/navigation";
 import { tierClass } from "@/lib/formatting";
+import { ProGate } from "@/components/shared/pro-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -326,6 +327,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
         </div>
       </GlassCard>
 
+      <ProGate feature="Game Projections">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CourtVision Projection */}
         {hasProj && (
@@ -681,6 +683,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
         </GlassCard>
         </ShareImageWrapper>
       )}
+      </ProGate>
     </div>
   );
 }

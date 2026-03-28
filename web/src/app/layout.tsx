@@ -18,6 +18,20 @@ export const metadata: Metadata = {
   title: "CourtVision — NBA Intelligence Platform",
   description:
     "Advanced NBA analytics: player evaluation, team intelligence, game projections, and matchup analysis. Explanation-first basketball research.",
+  openGraph: {
+    title: "CourtVision — NBA Intelligence Platform",
+    description:
+      "Advanced NBA analytics: player evaluation, team intelligence, game projections, and matchup analysis. Explanation-first basketball research.",
+    siteName: "CourtVision AI",
+    url: "https://courtvisionai.io",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CourtVision — NBA Intelligence Platform",
+    description:
+      "Advanced NBA analytics: player evaluation, team intelligence, game projections, and matchup analysis. Explanation-first basketball research.",
+  },
 };
 
 export default function RootLayout({
