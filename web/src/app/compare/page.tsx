@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { MetricTooltip } from "@/components/shared/metric-tooltip";
-import { Search, X, Trophy, Download, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, X, Trophy, Download, Zap, ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { toPng } from "html-to-image";
-import { getPlayerHeadshotUrl, getTeamLogoByAbbr } from "@/lib/nba-data";
+import { getPlayerHeadshotUrl, getTeamLogoByAbbr, NBA_TEAMS } from "@/lib/nba-data";
 import { tierClass, num } from "@/lib/formatting";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -18,11 +18,29 @@ interface PlayerOption {
   external_id: number | null;
   team_abbr: string;
   bis_score: number | null;
+  lfi_score: number | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const POSITIONS = ["All", "PG", "SG", "SF", "PF", "C"];
+
+const CONFERENCES = ["All", "East", "West"] as const;
+
+const CATEGORIES = [
+  { key: "all",     label: "All Players", icon: "" },
+  { key: "top10",   label: "Top 10",      icon: "⭐" },
+  { key: "hot",     label: "Hot",          icon: "🔥" },
+  { key: "allstar", label: "All-Stars",    icon: "🏆" },
+] as const;
+
+type Category = (typeof CATEGORIES)[number]["key"];
+
+const TEAM_ABBRS = Object.keys(NBA_TEAMS).sort((a, b) => {
+  const ta = NBA_TEAMS[a]; const tb = NBA_TEAMS[b];
+  if (ta.conference !== tb.conference) return ta.conference === "West" ? 1 : -1;
+  return ta.city.localeCompare(tb.city);
+});
 
 const SUGGESTED_MATCHUPS = [
   { label: "Wemby vs Jokić",    s1: "Wembanyama",    s2: "Jokic"        },
@@ -90,40 +108,230 @@ function PlayerPickerGrid({
 }) {
   const [query, setQuery] = useState("");
   const [pos, setPos] = useState("All");
+  const [conf, setConf] = useState<string>("All");
+  const [team, setTeam] = useState<string>("All");
+  const [category, setCategory] = useState<Category>("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset team when conference changes
+  useEffect(() => {
+    if (conf !== "All") setTeam("All");
+  }, [conf]);
 
   const filtered = useMemo(() => {
     let list = allPlayers.filter((p) => p.id !== excludeId);
+
+    // Conference filter
+    if (conf !== "All") {
+      list = list.filter((p) => {
+        const t = NBA_TEAMS[p.team_abbr];
+        return t && t.conference === conf;
+      });
+    }
+
+    // Team filter
+    if (team !== "All") {
+      list = list.filter((p) => p.team_abbr === team);
+    }
+
+    // Position filter
     if (pos !== "All") list = list.filter((p) => p.position?.includes(pos));
+
+    // Text search
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter((p) => p.full_name.toLowerCase().includes(q));
     }
-    return list.slice(0, 30);
-  }, [allPlayers, excludeId, pos, query]);
+
+    // Category filter
+    if (category === "top10") {
+      list = [...list].sort((a, b) => (Number(b.bis_score) || 0) - (Number(a.bis_score) || 0)).slice(0, 10);
+    } else if (category === "hot") {
+      list = [...list]
+        .filter((p) => p.lfi_score != null && Number(p.lfi_score) > 0)
+        .sort((a, b) => (Number(b.lfi_score) || 0) - (Number(a.lfi_score) || 0))
+        .slice(0, 15);
+    } else if (category === "allstar") {
+      list = [...list].sort((a, b) => (Number(b.bis_score) || 0) - (Number(a.bis_score) || 0)).slice(0, 24);
+    }
+
+    return list.slice(0, 36);
+  }, [allPlayers, excludeId, pos, query, conf, team, category]);
+
+  // Autocomplete dropdown (only when typing)
+  const searchResults = useMemo(() => {
+    if (!query.trim() || query.length < 2) return [];
+    const q = query.toLowerCase();
+    return allPlayers
+      .filter((p) => p.id !== excludeId && p.full_name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [allPlayers, excludeId, query]);
+
+  const showAutocomplete = query.length >= 2 && searchResults.length > 0;
+
+  const teamsByConf = useMemo(() => {
+    if (conf === "All") return TEAM_ABBRS;
+    return TEAM_ABBRS.filter((a) => NBA_TEAMS[a]?.conference === conf);
+  }, [conf]);
 
   return (
-    <div className="flex flex-col gap-3 h-full">
+    <div className="flex flex-col gap-2 h-full">
       {/* Header */}
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accentColor }}>
-        {slotLabel}
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accentColor }}>
+          {slotLabel}
+        </p>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded transition-all ${
+            showFilters || conf !== "All" || team !== "All" || category !== "all"
+              ? "text-indigo-400 bg-[rgba(129,140,248,0.08)]"
+              : "text-text-muted/40 hover:text-text-muted/60"
+          }`}
+        >
+          <Filter className="h-2.5 w-2.5" />
+          Filters{(conf !== "All" || team !== "All" || category !== "all") && " ·"}
+        </button>
+      </div>
 
-      {/* Search input */}
+      {/* Search input with autocomplete */}
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-muted/40" />
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name…"
-          className="w-full bg-white/[0.03] border border-white/[0.06] rounded-md pl-8 pr-3 py-1.5 text-[12px] text-text-primary placeholder-text-muted/30 focus:outline-none focus:border-[rgba(129,140,248,0.25)] transition-all"
+          placeholder="Type a player name…"
+          className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-8 pr-8 py-2 text-[12px] text-text-primary placeholder-text-muted/30 focus:outline-none focus:border-[rgba(129,140,248,0.3)] focus:bg-white/[0.05] transition-all"
         />
         {query && (
-          <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted/30 hover:text-text-muted">
+          <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted/30 hover:text-text-muted">
             <X className="h-3 w-3" />
           </button>
         )}
+
+        {/* Autocomplete dropdown */}
+        {showAutocomplete && (
+          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#0f1320] border border-white/[0.1] rounded-lg shadow-2xl overflow-hidden">
+            {searchResults.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => { onSelect(p); setQuery(""); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[rgba(129,140,248,0.08)] transition-all text-left border-b border-white/[0.04] last:border-0"
+              >
+                <div className="relative h-8 w-8 rounded-md overflow-hidden bg-white/[0.04] shrink-0">
+                  {p.external_id ? (
+                    <Image
+                      src={getPlayerHeadshotUrl(Number(p.external_id))}
+                      alt={p.full_name}
+                      fill
+                      className="object-cover object-top scale-[1.3] translate-y-[1px]"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-text-muted/20 text-[8px]">?</div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-text-primary truncate">{p.full_name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative h-3 w-3 shrink-0">
+                      <Image src={getTeamLogoByAbbr(p.team_abbr)} alt={p.team_abbr} fill className="object-contain" unoptimized />
+                    </div>
+                    <span className="text-[9px] text-text-muted">{p.team_abbr} · {p.position}</span>
+                  </div>
+                </div>
+                {p.bis_score != null && (
+                  <span className={`text-[11px] font-bold font-stat shrink-0 ${tierClass(Number(p.bis_score))}`}>
+                    {Number(p.bis_score).toFixed(0)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Expandable filters */}
+      {showFilters && (
+        <div className="space-y-2 animate-fade-in">
+          {/* Category quick-picks */}
+          <div className="flex flex-wrap gap-1">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setCategory(c.key)}
+                className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                  category === c.key
+                    ? "bg-[rgba(129,140,248,0.12)] text-indigo-400 border border-[rgba(129,140,248,0.25)]"
+                    : "text-text-muted/40 border border-transparent hover:text-text-muted/60 hover:bg-white/[0.02]"
+                }`}
+              >
+                {c.icon && <span className="mr-0.5">{c.icon}</span>}{c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Conference filter */}
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] text-text-muted/30 uppercase tracking-widest w-10 shrink-0">Conf</span>
+            <div className="flex gap-1">
+              {CONFERENCES.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setConf(c)}
+                  className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                    conf === c
+                      ? "bg-[rgba(129,140,248,0.12)] text-indigo-400 border border-[rgba(129,140,248,0.25)]"
+                      : "text-text-muted/40 border border-transparent hover:text-text-muted/60"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Team logo scroller */}
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] text-text-muted/30 uppercase tracking-widest w-10 shrink-0">Team</span>
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-0.5" style={{ scrollbarWidth: "none" }}>
+              <button
+                onClick={() => setTeam("All")}
+                className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded shrink-0 transition-all ${
+                  team === "All"
+                    ? "bg-[rgba(129,140,248,0.12)] text-indigo-400 border border-[rgba(129,140,248,0.25)]"
+                    : "text-text-muted/40 border border-transparent hover:text-text-muted/60"
+                }`}
+              >
+                All
+              </button>
+              {teamsByConf.map((abbr) => (
+                <button
+                  key={abbr}
+                  onClick={() => setTeam(abbr)}
+                  className={`relative h-6 w-6 rounded shrink-0 transition-all border ${
+                    team === abbr
+                      ? "border-indigo-400 bg-[rgba(129,140,248,0.12)] scale-110"
+                      : "border-transparent hover:border-white/[0.1] hover:bg-white/[0.03]"
+                  }`}
+                  title={`${NBA_TEAMS[abbr].city} ${NBA_TEAMS[abbr].name}`}
+                >
+                  <Image
+                    src={getTeamLogoByAbbr(abbr)}
+                    alt={abbr}
+                    fill
+                    className="object-contain p-0.5"
+                    unoptimized
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Position chips */}
       <div className="flex flex-wrap gap-1">
@@ -131,7 +339,7 @@ function PlayerPickerGrid({
           <button
             key={p}
             onClick={() => setPos(p)}
-            className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-sm transition-all ${
+            className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${
               pos === p
                 ? "bg-[rgba(129,140,248,0.1)] text-indigo-400 border border-[rgba(129,140,248,0.2)]"
                 : "text-text-muted/40 border border-transparent hover:text-text-muted/60"
@@ -143,7 +351,7 @@ function PlayerPickerGrid({
       </div>
 
       {/* Player grid */}
-      <div className="grid grid-cols-3 gap-2 overflow-y-auto flex-1 pr-0.5" style={{ maxHeight: 280 }}>
+      <div className="grid grid-cols-3 gap-1.5 overflow-y-auto flex-1 pr-0.5" style={{ maxHeight: showFilters ? 200 : 260 }}>
         {filtered.length === 0 && (
           <div className="col-span-3 text-center py-8 text-[11px] text-text-muted/30">
             No players found
@@ -153,9 +361,9 @@ function PlayerPickerGrid({
           <button
             key={p.id}
             onClick={() => onSelect(p)}
-            className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-white/[0.04] hover:border-[rgba(129,140,248,0.25)] hover:bg-[rgba(129,140,248,0.05)] transition-all group text-center"
+            className="flex flex-col items-center gap-1 p-1.5 rounded-lg border border-white/[0.04] hover:border-[rgba(129,140,248,0.25)] hover:bg-[rgba(129,140,248,0.05)] transition-all group text-center"
           >
-            <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-white/[0.04] shrink-0">
+            <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-white/[0.04] shrink-0">
               {p.external_id ? (
                 <Image
                   src={getPlayerHeadshotUrl(Number(p.external_id))}
@@ -167,15 +375,26 @@ function PlayerPickerGrid({
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-text-muted/20 text-[9px]">?</div>
               )}
+              {/* Team logo overlay */}
+              <div className="absolute bottom-0 right-0 h-3.5 w-3.5 bg-[#0a0e1a]/80 rounded-tl-sm">
+                <Image src={getTeamLogoByAbbr(p.team_abbr)} alt="" fill className="object-contain p-[1px]" unoptimized />
+              </div>
             </div>
-            <p className="text-[9px] font-semibold text-text-primary leading-tight line-clamp-2 w-full">
+            <p className="text-[8px] font-semibold text-text-primary leading-tight line-clamp-1 w-full">
               {p.full_name.split(" ").slice(1).join(" ") || p.full_name}
             </p>
-            {p.bis_score != null && (
-              <span className={`text-[9px] font-bold font-stat ${tierClass(Number(p.bis_score))}`}>
-                {Number(p.bis_score).toFixed(0)}
-              </span>
-            )}
+            <div className="flex items-center gap-1">
+              {p.bis_score != null && (
+                <span className={`text-[8px] font-bold font-stat ${tierClass(Number(p.bis_score))}`}>
+                  {Number(p.bis_score).toFixed(0)}
+                </span>
+              )}
+              {category === "hot" && p.lfi_score != null && (
+                <span className="text-[8px] font-bold font-stat text-orange-400">
+                  🔥{Number(p.lfi_score).toFixed(0)}
+                </span>
+              )}
+            </div>
           </button>
         ))}
       </div>

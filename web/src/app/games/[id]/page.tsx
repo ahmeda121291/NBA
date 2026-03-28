@@ -633,44 +633,53 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Player Projections</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[35%]" />
+                <col className="w-[11%]" />
+                <col className="w-[12%]" />
+                <col className="w-[11%]" />
+                <col className="w-[11%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-white/[0.04]">
-                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Player</th>
-                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Proj PTS</th>
-                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Range</th>
-                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Proj REB</th>
-                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Proj AST</th>
-                  <th className="px-3 py-2 text-right text-[9px] uppercase tracking-widest text-indigo-400/40">
+                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Player</th>
+                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Proj PTS</th>
+                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Range</th>
+                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Proj REB</th>
+                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Proj AST</th>
+                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-indigo-400/50 whitespace-nowrap">
                     <MetricTooltip metricKey="bis">BIS</MetricTooltip>
                   </th>
-                  <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Vol</th>
+                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Vol</th>
                 </tr>
               </thead>
               <tbody>
                 {pProj.map((p: any, i: number) => (
                   <tr key={i} className="border-b border-white/[0.03] table-row-hover">
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 truncate">
                       <a href={`/players/${p.player_id}`} className="hover:text-indigo-400 transition-colors">
                         <span className="font-semibold text-text-primary">{p.full_name}</span>
                         <span className="text-[10px] text-text-muted ml-1.5">{p.team_abbr}</span>
                       </a>
                     </td>
-                    <td className="px-3 py-2 text-right font-stat font-bold text-text-primary">{p.proj_pts != null ? Number(p.proj_pts).toFixed(1) : "—"}</td>
-                    <td className="px-3 py-2 text-right font-stat text-text-muted/50 text-[11px]">
-                      {p.proj_pts_low != null ? `${Number(p.proj_pts_low).toFixed(0)}-${Number(p.proj_pts_high).toFixed(0)}` : "—"}
+                    <td className="px-2 py-2 text-right font-stat font-bold text-text-primary whitespace-nowrap">{p.proj_pts != null ? Number(p.proj_pts).toFixed(1) : "—"}</td>
+                    <td className="px-2 py-2 text-right font-stat text-text-muted/50 text-[11px] whitespace-nowrap">
+                      {p.proj_pts_low != null ? `${Number(p.proj_pts_low).toFixed(0)}–${Number(p.proj_pts_high).toFixed(0)}` : "—"}
                     </td>
-                    <td className="px-3 py-2 text-right font-stat text-text-muted">{p.proj_reb != null ? Number(p.proj_reb).toFixed(1) : "—"}</td>
-                    <td className="px-3 py-2 text-right font-stat text-text-muted">{p.proj_ast != null ? Number(p.proj_ast).toFixed(1) : "—"}</td>
-                    <td className={`px-3 py-2 text-right font-stat font-bold ${tierClass(p.bis_score ? Number(p.bis_score) : null)}`}>
+                    <td className="px-2 py-2 text-right font-stat text-text-muted whitespace-nowrap">{p.proj_reb != null ? Number(p.proj_reb).toFixed(1) : "—"}</td>
+                    <td className="px-2 py-2 text-right font-stat text-text-muted whitespace-nowrap">{p.proj_ast != null ? Number(p.proj_ast).toFixed(1) : "—"}</td>
+                    <td className={`px-2 py-2 text-right font-stat font-bold whitespace-nowrap ${tierClass(p.bis_score ? Number(p.bis_score) : null)}`}>
                       {p.bis_score ? Number(p.bis_score).toFixed(0) : "—"}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-2 py-2 text-right whitespace-nowrap">
                       <span className={`text-[10px] font-bold uppercase ${
                         p.proj_volatility === "high" ? "text-amber-400" :
                         p.proj_volatility === "moderate" ? "text-text-muted/60" :
                         "text-emerald-400/60"
-                      }`}>{p.proj_volatility}</span>
+                      }`}>{p.proj_volatility ?? "—"}</span>
                     </td>
                   </tr>
                 ))}
