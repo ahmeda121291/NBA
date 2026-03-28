@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 interface GlassCardProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   variant?: "default" | "accent" | "metric";
   hover?: boolean;
   glow?: "emerald" | "blue" | "amber" | "orange" | "rose" | "none";
@@ -12,6 +13,7 @@ interface GlassCardProps {
 export function GlassCard({
   children,
   className,
+  style,
   variant = "default",
   hover = true,
   glow = "none",
@@ -35,6 +37,7 @@ export function GlassCard({
 
   return (
     <div
+      style={style}
       className={cn(
         "rounded-2xl transition-all duration-300",
         variant === "default" && "glass-card",
