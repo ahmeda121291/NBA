@@ -635,13 +635,13 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-fixed">
               <colgroup>
-                <col className="w-[35%]" />
-                <col className="w-[11%]" />
-                <col className="w-[12%]" />
-                <col className="w-[11%]" />
-                <col className="w-[11%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
+                <col className="w-[22%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-white/[0.04]">
