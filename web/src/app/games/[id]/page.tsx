@@ -634,59 +634,49 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             <Zap className="h-3.5 w-3.5 text-indigo-400" />
             <h2 className="text-xs font-semibold uppercase tracking-widest text-text-muted">Player Projections</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm table-fixed">
-              <colgroup>
-                <col className="w-[40%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-white/[0.04]">
-                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Player</th>
-                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Proj PTS</th>
-                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Range</th>
-                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Proj REB</th>
-                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Proj AST</th>
-                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-indigo-400/50 whitespace-nowrap">
-                    <MetricTooltip metricKey="bis">BIS</MetricTooltip>
-                  </th>
-                  <th className="px-2 py-2 text-right text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 whitespace-nowrap">Vol</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pProj.map((p: any, i: number) => (
-                  <tr key={i} className="border-b border-white/[0.03] table-row-hover">
-                    <td className="px-3 py-2 truncate">
-                      <a href={`/players/${p.player_id}`} className="hover:text-indigo-400 transition-colors">
-                        <span className="font-semibold text-text-primary">{p.full_name}</span>
-                        <span className="text-[10px] text-text-muted ml-1.5">{p.team_abbr}</span>
-                      </a>
-                    </td>
-                    <td className="px-2 py-2 text-right font-stat font-bold text-text-primary whitespace-nowrap">{p.proj_pts != null ? Number(p.proj_pts).toFixed(1) : "—"}</td>
-                    <td className="px-2 py-2 text-right font-stat text-text-muted/50 text-[11px] whitespace-nowrap">
-                      {p.proj_pts_low != null ? `${Number(p.proj_pts_low).toFixed(0)}–${Number(p.proj_pts_high).toFixed(0)}` : "—"}
-                    </td>
-                    <td className="px-2 py-2 text-right font-stat text-text-muted whitespace-nowrap">{p.proj_reb != null ? Number(p.proj_reb).toFixed(1) : "—"}</td>
-                    <td className="px-2 py-2 text-right font-stat text-text-muted whitespace-nowrap">{p.proj_ast != null ? Number(p.proj_ast).toFixed(1) : "—"}</td>
-                    <td className={`px-2 py-2 text-right font-stat font-bold whitespace-nowrap ${tierClass(p.bis_score ? Number(p.bis_score) : null)}`}>
-                      {p.bis_score ? Number(p.bis_score).toFixed(0) : "—"}
-                    </td>
-                    <td className="px-2 py-2 text-right whitespace-nowrap">
-                      <span className={`text-[10px] font-bold uppercase ${
-                        p.proj_volatility === "high" ? "text-amber-400" :
-                        p.proj_volatility === "moderate" ? "text-text-muted/60" :
-                        "text-emerald-400/60"
-                      }`}>{p.proj_volatility ?? "—"}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-1">
+            {/* Header row */}
+            <div className="grid grid-cols-[1fr_60px_70px_52px_52px_44px_52px] gap-0 items-center px-2 py-1.5">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-text-muted/50">Player</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 text-right">PTS</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 text-right">Range</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 text-right">REB</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 text-right">AST</span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-indigo-400/50 text-right">
+                <MetricTooltip metricKey="bis">BIS</MetricTooltip>
+              </span>
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-text-muted/50 text-right">Vol</span>
+            </div>
+            <div className="h-px bg-white/[0.06]" />
+            {/* Player rows */}
+            {pProj.map((p: any, i: number) => (
+              <a
+                key={i}
+                href={`/players/${p.player_id}`}
+                className="grid grid-cols-[1fr_60px_70px_52px_52px_44px_52px] gap-0 items-center px-2 py-2 rounded-lg hover:bg-white/[0.03] transition-colors group"
+              >
+                <div className="min-w-0">
+                  <span className="font-semibold text-sm text-text-primary group-hover:text-indigo-400 transition-colors truncate block">{p.full_name}</span>
+                  <span className="text-[10px] text-text-muted">{p.team_abbr}</span>
+                </div>
+                <span className="text-right font-stat font-bold text-sm text-text-primary">{p.proj_pts != null ? Number(p.proj_pts).toFixed(1) : "—"}</span>
+                <span className="text-right font-stat text-text-muted/50 text-[11px]">
+                  {p.proj_pts_low != null ? `${Number(p.proj_pts_low).toFixed(0)}–${Number(p.proj_pts_high).toFixed(0)}` : "—"}
+                </span>
+                <span className="text-right font-stat text-sm text-text-muted">{p.proj_reb != null ? Number(p.proj_reb).toFixed(1) : "—"}</span>
+                <span className="text-right font-stat text-sm text-text-muted">{p.proj_ast != null ? Number(p.proj_ast).toFixed(1) : "—"}</span>
+                <span className={`text-right font-stat text-sm font-bold ${tierClass(p.bis_score ? Number(p.bis_score) : null)}`}>
+                  {p.bis_score ? Number(p.bis_score).toFixed(0) : "—"}
+                </span>
+                <span className="text-right">
+                  <span className={`text-[10px] font-bold uppercase ${
+                    p.proj_volatility === "high" ? "text-amber-400" :
+                    p.proj_volatility === "moderate" ? "text-text-muted/60" :
+                    "text-emerald-400/60"
+                  }`}>{p.proj_volatility ?? "—"}</span>
+                </span>
+              </a>
+            ))}
           </div>
         </GlassCard>
         </ShareImageWrapper>
