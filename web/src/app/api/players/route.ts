@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     JOIN player_season_stats pss ON p.id = pss.player_id
     JOIN teams t ON pss.team_id = t.id
     LEFT JOIN player_metric_snapshots pms ON pms.player_id = p.id
-    WHERE pss.gp >= 5
+    WHERE pss.games_played >= 5
       AND (${q} = '' OR LOWER(p.full_name) LIKE ${'%' + q.toLowerCase() + '%'})
       AND (${pos} = '' OR p.position ILIKE ${'%' + pos + '%'})
     ORDER BY p.id, pms.bis_score DESC NULLS LAST
