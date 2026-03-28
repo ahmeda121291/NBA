@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ScoreOrb } from "@/components/ui/score-orb";
+import { ShareImageWrapper } from "@/components/shared/share-image-button";
 import { Trophy, Flame } from "lucide-react";
 import { getTeamLogoByAbbr, getPlayerHeadshotUrl } from "@/lib/nba-data";
 import { getAllPlayersWithFullStats, getHottestPlayers } from "@/lib/db/queries";
@@ -31,43 +32,45 @@ export default async function LeaderboardsPage() {
       </div>
 
       {/* Top 3 BIS Podium */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {top3.map((p: any, i: number) => {
-          const bis = Number(p.bis_score);
-          return (
-            <a key={p.id} href={`/players/${p.id}`} className="block group">
-              <GlassCard variant={i === 0 ? "accent" : "default"} className="text-center">
-                <div className="flex items-center justify-center mb-3">
-                  <div className={`flex h-8 w-8 items-center justify-center ${
-                    i === 0 ? "bg-amber-500/15 border border-amber-500/25" :
-                    i === 1 ? "bg-slate-400/15 border border-slate-400/25" :
-                    "bg-amber-700/15 border border-amber-700/25"
-                  } rounded-sm`}>
-                    <Trophy className={`h-4 w-4 ${
-                      i === 0 ? "text-amber-400" : i === 1 ? "text-slate-400" : "text-amber-600"
-                    }`} />
+      <ShareImageWrapper filename="courtvision-top3" label="Save Top 3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {top3.map((p: any, i: number) => {
+            const bis = Number(p.bis_score);
+            return (
+              <a key={p.id} href={`/players/${p.id}`} className="block group">
+                <GlassCard variant={i === 0 ? "accent" : "default"} className="text-center">
+                  <div className="flex items-center justify-center mb-3">
+                    <div className={`flex h-8 w-8 items-center justify-center ${
+                      i === 0 ? "bg-amber-500/15 border border-amber-500/25" :
+                      i === 1 ? "bg-slate-400/15 border border-slate-400/25" :
+                      "bg-amber-700/15 border border-amber-700/25"
+                    } rounded-sm`}>
+                      <Trophy className={`h-4 w-4 ${
+                        i === 0 ? "text-amber-400" : i === 1 ? "text-slate-400" : "text-amber-600"
+                      }`} />
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-center mb-3">
-                  <div className="relative h-16 w-16 rounded-sm overflow-hidden bg-white/[0.04] border border-white/[0.06]">
-                    <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.4] translate-y-[2px]" unoptimized />
+                  <div className="flex justify-center mb-3">
+                    <div className="relative h-16 w-16 rounded-sm overflow-hidden bg-white/[0.04] border border-white/[0.06]">
+                      <Image src={getPlayerHeadshotUrl(Number(p.external_id))} alt={p.full_name} fill className="object-cover object-top scale-[1.4] translate-y-[2px]" unoptimized />
+                    </div>
                   </div>
-                </div>
-                <p className="text-[13px] font-semibold group-hover:text-indigo-400 transition-colors">{p.full_name}</p>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className="relative h-3.5 w-3.5">
-                    <Image src={getTeamLogoByAbbr(p.team_abbr)} alt={p.team_abbr} fill className="object-contain" unoptimized />
+                  <p className="text-[13px] font-semibold group-hover:text-indigo-400 transition-colors">{p.full_name}</p>
+                  <div className="flex items-center justify-center gap-1.5 mt-1">
+                    <div className="relative h-3.5 w-3.5">
+                      <Image src={getTeamLogoByAbbr(p.team_abbr)} alt={p.team_abbr} fill className="object-contain" unoptimized />
+                    </div>
+                    <span className="text-[10px] text-text-muted">{p.team_abbr}</span>
                   </div>
-                  <span className="text-[10px] text-text-muted">{p.team_abbr}</span>
-                </div>
-                <div className="mt-3">
-                  <ScoreOrb score={bis} size="sm" label="BIS" />
-                </div>
-              </GlassCard>
-            </a>
-          );
-        })}
-      </div>
+                  <div className="mt-3">
+                    <ScoreOrb score={bis} size="sm" label="BIS" />
+                  </div>
+                </GlassCard>
+              </a>
+            );
+          })}
+        </div>
+      </ShareImageWrapper>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Metric Leaderboard with tabs — 3 cols */}
@@ -79,6 +82,7 @@ export default async function LeaderboardsPage() {
 
         {/* LFI Hot Players — 2 cols */}
         <div className="lg:col-span-2">
+          <ShareImageWrapper filename="courtvision-hot-players" label="Save Hot Players">
           <GlassCard padding="sm" hover={false} className="overflow-hidden">
             <div className="flex items-center gap-2.5 px-3 pt-2 pb-1">
               <Flame className="h-3.5 w-3.5 text-emerald-400" />
@@ -117,6 +121,7 @@ export default async function LeaderboardsPage() {
               })}
             </div>
           </GlassCard>
+          </ShareImageWrapper>
         </div>
       </div>
     </div>

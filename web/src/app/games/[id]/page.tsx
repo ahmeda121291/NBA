@@ -2,6 +2,7 @@ import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { MetricTooltip } from "@/components/shared/metric-tooltip";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { ShareImageWrapper } from "@/components/shared/share-image-button";
 import { ArrowLeft, Activity, Target, TrendingUp, AlertTriangle, Check, X, Zap, Swords } from "lucide-react";
 import { getTeamLogoByAbbr } from "@/lib/nba-data";
 import { getGameById, getTeamWithMetrics, getGameProjection, getGamePlayerProjections, getGamePlayerLogs } from "@/lib/db/queries";
@@ -627,6 +628,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
 
       {/* Player Projections (scheduled games) */}
       {!isFinal && pProj.length > 0 && (
+        <ShareImageWrapper filename="courtvision-projections" label="Save Projections">
         <GlassCard>
           <div className="flex items-center gap-2 mb-4">
             <Zap className="h-3.5 w-3.5 text-indigo-400" />
@@ -635,13 +637,13 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-fixed">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
+                <col className="w-[40%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-white/[0.04]">
@@ -687,6 +689,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             </table>
           </div>
         </GlassCard>
+        </ShareImageWrapper>
       )}
     </div>
   );
