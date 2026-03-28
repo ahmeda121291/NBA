@@ -1,6 +1,18 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// Lazy init to avoid crashing at build time when env var is missing
+let _stripe: Stripe | null = null;
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  }
+  return _stripe;
+}
+
+/** @deprecated Use getStripe() instead — kept for backward compat */
+export const stripe = typeof process.env.STRIPE_SECRET_KEY === "string"
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : (null as unknown as Stripe);
 
 export const PLANS = {
   free: {

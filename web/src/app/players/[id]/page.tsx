@@ -13,6 +13,7 @@ import { tierClass, tierLabel, tierBorder, getStreakBadge, consistencyInfo } fro
 import { CURRENT_SEASON } from "@/lib/constants";
 import { PerformanceTrendChart } from "@/components/ui/performance-trend-chart";
 import { FavoritePlayerButton } from "@/components/shared/favorite-button";
+import { ProGate } from "@/components/shared/pro-gate";
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -145,6 +146,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
 
       {/* CourtVision Metrics Panel */}
       {hasMetrics && (
+        <ProGate feature="Advanced Metrics">
         <div className={`grid grid-cols-1 gap-6 ${showRadar ? "lg:grid-cols-3" : ""}`}>
           {/* Radar Chart */}
           {showRadar && (
@@ -199,6 +201,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
             )}
           </div>
         </div>
+        </ProGate>
       )}
       </ShareImageWrapper>
 
@@ -228,7 +231,8 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
         </div>
       </GlassCard>
 
-      {/* Performance Trend */}
+      {/* Performance Trend, Contract Value, Scouting Report, Opponent Splits, Game Logs — Pro only */}
+      <ProGate feature="Advanced Analytics">
       {gameLogs.length >= 3 && (() => {
         const trendData = gameLogs.slice().reverse().map((gl: any, i: number) => ({
           game: i + 1,
@@ -469,6 +473,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           </div>
         </GlassCard>
       )}
+      </ProGate>
     </div>
   );
 }

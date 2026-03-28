@@ -5,7 +5,7 @@ import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { MetricTooltip } from "@/components/shared/metric-tooltip";
 import { Search, X, Trophy, Zap, ChevronDown, ChevronUp, Filter } from "lucide-react";
-import { ShareImageButton } from "@/components/shared/share-image-button";
+import { ShareImageWrapper } from "@/components/shared/share-image-button";
 import { getPlayerHeadshotUrl, getTeamLogoByAbbr, NBA_TEAMS } from "@/lib/nba-data";
 import { tierClass, num } from "@/lib/formatting";
 
@@ -844,7 +844,6 @@ export default function ComparePage() {
   const [loading, setLoading]  = useState(false);
   const [verdictOpen, setVerdictOpen] = useState(true);
 
-  const shareRef = useRef<HTMLDivElement>(null);
   const hasComparison = !!(player1 && player2);
 
   // Load full player roster on mount
@@ -973,7 +972,7 @@ export default function ComparePage() {
       )}
 
       {/* ── Battle Arena ─────────────────────────────────────────────────── */}
-      <div ref={shareRef}>
+      <ShareImageWrapper filename="courtvision-compare" label="Save Comparison">
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_56px_1fr] gap-4 items-stretch">
 
           {/* Slot 1 */}
@@ -1057,9 +1056,9 @@ export default function ComparePage() {
             <MetricBattle p1={player1} p2={player2} />
           </div>
         )}
-      </div>
+      </ShareImageWrapper>
 
-      {/* ── Verdict (outside share ref — text doesn't render well in PNG) ── */}
+      {/* ── Verdict ── */}
       {hasComparison && verdict && (
         <GlassCard variant="accent">
           {/* Header row */}
@@ -1069,7 +1068,6 @@ export default function ComparePage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">The Verdict</span>
             </div>
             <div className="flex items-center gap-2">
-              <ShareImageButton targetRef={shareRef} filename="courtvision-compare" label="Save as Image" />
               <button
                 onClick={() => setVerdictOpen(!verdictOpen)}
                 className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary transition-colors border border-white/[0.08] rounded px-2.5 py-1"

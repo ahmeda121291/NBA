@@ -1,5 +1,26 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: "NBA Leaderboards | CourtVision AI",
+  description:
+    "Top NBA players ranked by BIS, defense, offense, playmaking, and clutch performance.",
+  openGraph: {
+    title: "NBA Leaderboards | CourtVision AI",
+    description:
+      "Top NBA players ranked by BIS, defense, offense, playmaking, and clutch performance.",
+    siteName: "CourtVision AI",
+    url: "https://courtvisionai.io/leaderboards",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NBA Leaderboards | CourtVision AI",
+    description:
+      "Top NBA players ranked by BIS, defense, offense, playmaking, and clutch performance.",
+  },
+};
 import { GlassCard } from "@/components/ui/glass-card";
 import { ScoreOrb } from "@/components/ui/score-orb";
 import { ShareImageWrapper } from "@/components/shared/share-image-button";
